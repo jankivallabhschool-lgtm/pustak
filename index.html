@@ -1,0 +1,3087 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>શાળા ગ્રંથાલય ઇસ્યુ & ડેડસ્ટોક રજીસ્ટર સિસ્ટમ</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tesseract.js (v5) CDN for Gujarati OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Shruti&family=Noto+Sans+Gujarati:wght@400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Noto Sans Gujarati', 'Shruti', system-ui, sans-serif;
+      background-color: #f1f5f9;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* 3D Embossed Effect for School Header */
+    .text-3d-title {
+      color: #1e1b4b;
+      text-shadow: 1px 1px 0px #c7d2fe, 2px 2px 0px #a5b4fc, 3px 3px 2px rgba(30, 27, 75, 0.25);
+    }
+    .text-3d-sub {
+      color: #312e81;
+      text-shadow: 1px 1px 0px #e0e7ff;
+    }
+
+    /* Royal Double Border Frame for Printable Official Headings */
+    .official-print-frame {
+      border: 3px double #1e1b4b;
+      border-radius: 12px;
+      padding: 10px 14px;
+      background-color: #ffffff;
+    }
+
+    /* A4 Landscape Print Specific Styles */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 5mm 8mm 5mm 8mm;
+      }
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-size: 11px !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .print-page-break {
+        page-break-before: always;
+      }
+      .print-card-wrapper {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      .register-table th, .register-table td {
+        border: 1px solid #1e293b !important;
+        padding: 4px 6px !important;
+      }
+      .register-table th {
+        background-color: #e2e8f0 !important;
+        color: #0f172a !important;
+      }
+      table {
+        page-break-inside: auto;
+      }
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+      thead {
+        display: table-header-group;
+      }
+      tfoot {
+        display: table-footer-group;
+      }
+    }
+    .register-table th, .register-table td {
+      border: 1px solid #cbd5e1;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col pb-16 md:pb-0">
+
+  <!-- ============================================== -->
+  <!-- LICENSE LOCK SCREEN                            -->
+  <!-- ============================================== -->
+  <div id="licenseOverlay" class="fixed inset-0 z-[100] bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 flex items-center justify-center p-4 overflow-y-auto no-print">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6 space-y-4">
+      <div class="text-center space-y-1">
+        <div class="inline-flex p-3 bg-amber-400 text-indigo-950 rounded-2xl shadow">
+          <i data-lucide="lock" class="w-7 h-7"></i>
+        </div>
+        <h2 class="text-lg font-black text-indigo-950">શાળા ગ્રંથાલય રજીસ્ટર</h2>
+        <p class="text-xs text-slate-500">લાઇસન્સ ચકાસણી — ઉપયોગ કરવા માટે લૉગિન કરો</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
+        <button type="button" id="licTabLogin" onclick="showLicenseTab('login')" class="py-2 rounded-md bg-white text-indigo-900 shadow">લૉગિન</button>
+        <button type="button" id="licTabReset" onclick="showLicenseTab('reset')" class="py-2 rounded-md text-slate-600">પાસવર્ડ રીસેટ</button>
+      </div>
+
+      <div id="licMsg" class="hidden text-xs rounded-lg p-2.5 font-semibold"></div>
+
+      <form id="licLoginForm" onsubmit="handleLicenseLogin(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">DISE કોડ</label>
+          <input type="text" id="licDise" required inputmode="numeric" autocomplete="username" placeholder="શાળાનો DISE કોડ"
+                 class="w-full px-3 py-2.5 border rounded-lg text-sm outline-none font-mono focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">પાસવર્ડ</label>
+          <input type="password" id="licPassword" required autocomplete="current-password" placeholder="પાસવર્ડ"
+                 class="w-full px-3 py-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <button type="submit" id="licLoginBtn" class="w-full py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-sm font-bold shadow">લૉગિન કરો</button>
+        <p class="text-[11px] text-slate-500 text-center">પહેલી વાર લૉગિન માટે ઇન્ટરનેટ જરૂરી છે.</p>
+      </form>
+
+      <form id="licResetForm" onsubmit="handleLicenseReset(event)" class="space-y-3 hidden">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">DISE કોડ</label>
+          <input type="text" id="licResetDise" required inputmode="numeric" class="w-full px-3 py-2.5 border rounded-lg text-sm outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">રિકવરી કોડ (ખરીદી વખતે મળેલો)</label>
+          <input type="text" id="licRecovery" required autocomplete="off" class="w-full px-3 py-2.5 border rounded-lg text-sm outline-none font-mono uppercase">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">નવો પાસવર્ડ (ઓછામાં ઓછા ૬ અક્ષર)</label>
+          <input type="password" id="licNewPw" required minlength="6" autocomplete="new-password" class="w-full px-3 py-2.5 border rounded-lg text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">નવો પાસવર્ડ ફરી લખો</label>
+          <input type="password" id="licNewPw2" required minlength="6" autocomplete="new-password" class="w-full px-3 py-2.5 border rounded-lg text-sm outline-none">
+        </div>
+        <button type="submit" id="licResetBtn" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-bold shadow">પાસવર્ડ રીસેટ કરો</button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ============================================== -->
+  <!-- TOP APP HEADER (MOBILE & DESKTOP RESPONSIVE)    -->
+  <!-- ============================================== -->
+  <header class="bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 text-white shadow-md no-print sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 flex justify-between items-center gap-2">
+      <div class="flex items-center space-x-2 sm:space-x-3 overflow-hidden">
+        <div class="p-1.5 sm:p-2 bg-amber-400 text-indigo-950 rounded-xl shadow font-bold flex-shrink-0">
+          <i data-lucide="book-open-check" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+        </div>
+        <div class="truncate">
+          <h1 class="text-sm sm:text-base md:text-lg font-bold tracking-tight truncate">શાળા ગ્રંથાલય ઇસ્યુ & ડેડસ્ટોક રજીસ્ટર</h1>
+          <p class="text-[10px] sm:text-xs text-indigo-200 hidden sm:block">ડેડસ્ટોક નોંધણી • સ્ત્રોતવાર વર્ગીકરણ • કમી પુસ્તક બ્લોકિંગ • JSON બેકઅપ</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <label title="JSON બેકઅપ ફાઇલ અપલોડ કરી ડેટા પાછો લાવો" class="cursor-pointer px-2.5 sm:px-3 py-1.5 bg-sky-700 hover:bg-sky-600 rounded-lg text-xs font-semibold flex items-center gap-1 sm:gap-1.5 border border-sky-400 shadow transition">
+          <i data-lucide="file-up" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">JSON</span> અપલોડ
+          <input type="file" accept=".json,application/json" onchange="importJsonBackup(event)" class="hidden">
+        </label>
+        <button onclick="downloadJsonBackup()" id="btnJsonBackup" title="તમામ ડેટા JSON ફાઇલમાં ડાઉનલોડ કરો" class="px-2.5 sm:px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-xs font-semibold flex items-center gap-1 sm:gap-1.5 border border-emerald-400 shadow transition">
+          <i data-lucide="file-down" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">JSON</span> ડાઉનલોડ
+        </button>
+        <button onclick="exportAllData()" title="Excel બેકઅપ" class="px-2 sm:px-2.5 py-1.5 bg-indigo-800 hover:bg-indigo-700 rounded-lg text-xs font-semibold flex items-center gap-1 border border-indigo-500 shadow transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- DESKTOP NAVIGATION TABS                        -->
+    <!-- ============================================== -->
+    <div class="bg-indigo-900/90 border-t border-indigo-800/80 px-2 sm:px-4 py-1.5 hidden md:block">
+      <div class="max-w-7xl mx-auto flex flex-wrap gap-1.5">
+        <button onclick="switchTab('issue-entry')" id="tab-issue-entry" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-amber-400 text-indigo-950 shadow">
+          <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i> ૧. પુસ્તક ઇસ્યુ / જૂની નોંધ
+        </button>
+        <button onclick="switchTab('register')" id="tab-register" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i> ૨. ઇસ્યુ રજીસ્ટર (A4 Print)
+        </button>
+        <button onclick="switchTab('deadstock')" id="tab-deadstock" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="archive" class="w-3.5 h-3.5 text-amber-300"></i> ૩. પુસ્તક ડેડસ્ટોક રજીસ્ટર
+        </button>
+        <button onclick="switchTab('camera-entry')" id="tab-camera-entry" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="camera" class="w-3.5 h-3.5 text-emerald-300"></i> ૪. ગુજરાતી પુસ્તક સ્કેન (OCR)
+        </button>
+        <button onclick="switchTab('manual-entry')" id="tab-manual-entry" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-sky-300"></i> ૫. મેન્યુઅલ ઉમેરો (વિદ્યાર્થી/પુસ્તક)
+        </button>
+        <button onclick="switchTab('reports')" id="tab-reports" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-pink-300"></i> ૬. માસવાર/ધોરણવાર રિપોર્ટ
+        </button>
+        <button onclick="switchTab('student-card')" id="tab-student-card" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-teal-300"></i> ૭. વિદ્યાર્થી કાર્ડ
+        </button>
+        <button onclick="switchTab('masters')" id="tab-masters" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="database" class="w-3.5 h-3.5 text-purple-300"></i> ૮. Excel માસ્ટર
+        </button>
+        <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-indigo-100 hover:bg-indigo-800">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-300"></i> ૯. સેટિંગ્સ
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MOBILE NAVIGATION (૩ લાઈનમાં સુવ્યવસ્થિત 9 TABS) -->
+    <!-- ============================================== -->
+    <div class="bg-indigo-950/95 border-t border-indigo-800/80 md:hidden p-2">
+      <div class="grid grid-cols-3 gap-1.5">
+        <!-- લાઈન ૧ -->
+        <button onclick="switchTab('issue-entry')" id="mob-tab-issue-entry" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-bold bg-amber-400 text-indigo-950 shadow flex items-center justify-center gap-1 transition">
+          <i data-lucide="calendar-plus" class="w-3 h-3"></i> ૧. ઇસ્યુ
+        </button>
+        <button onclick="switchTab('register')" id="mob-tab-register" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="printer" class="w-3 h-3 text-amber-300"></i> ૨. રજીસ્ટર
+        </button>
+        <button onclick="switchTab('deadstock')" id="mob-tab-deadstock" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="archive" class="w-3 h-3 text-amber-300"></i> ૩. ડેડસ્ટોક
+        </button>
+
+        <!-- લાઈન ૨ -->
+        <button onclick="switchTab('camera-entry')" id="mob-tab-camera-entry" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="camera" class="w-3 h-3 text-emerald-300"></i> ૪. OCR
+        </button>
+        <button onclick="switchTab('manual-entry')" id="mob-tab-manual-entry" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="user-plus" class="w-3 h-3 text-sky-300"></i> ૫. ઉમેરો
+        </button>
+        <button onclick="switchTab('reports')" id="mob-tab-reports" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="bar-chart-3" class="w-3 h-3 text-pink-300"></i> ૬. રિપોર્ટ
+        </button>
+
+        <!-- લાઈન ૩ -->
+        <button onclick="switchTab('student-card')" id="mob-tab-student-card" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="user-check" class="w-3 h-3 text-teal-300"></i> ૭. કાર્ડ
+        </button>
+        <button onclick="switchTab('masters')" id="mob-tab-masters" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="database" class="w-3 h-3 text-purple-300"></i> ૮. Excel
+        </button>
+        <button onclick="switchTab('settings')" id="mob-tab-settings" class="mob-tab py-1.5 px-1 rounded-lg text-[11px] font-medium bg-indigo-900 text-indigo-100 border border-indigo-800/70 flex items-center justify-center gap-1 transition">
+          <i data-lucide="settings" class="w-3 h-3 text-slate-300"></i> ૯. સેટિંગ્સ
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Backup Status Banner -->
+  <div id="syncStatusBanner" class="bg-sky-50 border-b border-sky-200 px-4 py-1.5 text-xs flex justify-between items-center text-sky-900 no-print">
+    <div class="flex items-center gap-2">
+      <span id="backupDot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+      <span id="syncStatusMsg">ડેટા આ ડિવાઇસમાં સેવ થાય છે.</span>
+    </div>
+    <span class="text-[11px] text-slate-500" id="syncLastTime">છેલ્લો બેકઅપ: -</span>
+  </div>
+
+  <!-- Reusable Official Header Template with Double 3D Text & Frame -->
+  <template id="officialHeaderTemplate">
+    <div class="official-print-frame mb-3.5">
+      <div class="flex items-center justify-between gap-4">
+        <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center border-2 border-indigo-900/30 rounded-xl p-1 bg-white shadow-inner">
+          <img class="school-logo-img max-h-full max-w-full object-contain" src="" alt="Logo">
+        </div>
+        <div class="text-center flex-1">
+          <h2 class="school-name-text text-lg sm:text-2xl md:text-3xl font-black uppercase tracking-wide leading-tight text-3d-title"></h2>
+          <p class="school-address-text text-xs sm:text-sm font-bold text-slate-600 mt-1 text-3d-sub"></p>
+          <div class="flex flex-wrap items-center justify-center gap-2.5 mt-2 text-xs font-bold">
+            <span class="bg-indigo-50 border-2 border-indigo-200 px-3 py-0.5 rounded-full text-indigo-950 font-black shadow-sm">
+              DISE CODE: <span class="school-dise-text font-mono font-black"></span>
+            </span>
+            <span class="report-title-badge px-3.5 py-1 rounded-full text-white bg-indigo-950 font-extrabold uppercase shadow"></span>
+          </div>
+        </div>
+        <div class="w-36 text-right text-[11px] font-semibold text-slate-600 border-l border-indigo-900/20 pl-3">
+          <p>સત્ર: <span class="font-black text-indigo-950 school-year-text">2026-27</span></p>
+          <p>તારીખ: <span class="font-bold text-slate-900 school-date-text"></span></p>
+          <p class="mt-0.5 extra-meta-text font-black text-indigo-900"></p>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Main Work Area -->
+  <main class="max-w-7xl mx-auto px-2 sm:px-4 py-3 sm:py-6 flex-1 w-full">
+
+    <!-- ============================================== -->
+    <!-- TAB 1 (DEFAULT): BACKDATED & REGULAR ISSUE     -->
+    <!-- ============================================== -->
+    <div id="content-issue-entry" class="tab-content space-y-6 no-print">
+
+      <!-- ★ માસિક ઓટો પુસ્તક ફાળવણી (નવું) -->
+      <div class="bg-emerald-50 p-4 sm:p-5 rounded-xl shadow-sm border-2 border-emerald-200 space-y-3">
+        <h2 class="text-base font-bold text-emerald-900 flex items-center gap-2">
+          <i data-lucide="wand-2" class="w-5 h-5 text-emerald-700"></i> માસિક ઓટો ફાળવણી (દરેક વિદ્યાર્થીને ૧ પુસ્તક)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">ધોરણ</label>
+            <select id="autoStdSelect" class="w-full px-3 py-2 border rounded-lg text-sm bg-white">
+              <option value="ALL">તમામ ધોરણ</option>
+              <option value="1">ધોરણ ૧</option><option value="2">ધોરણ ૨</option>
+              <option value="3">ધોરણ ૩</option><option value="4">ધોરણ ૪</option>
+              <option value="5">ધોરણ ૫</option><option value="6">ધોરણ ૬</option>
+              <option value="7">ધોરણ ૭</option><option value="8">ધોરણ ૮</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">ઇસ્યુ તારીખ</label>
+            <input type="date" id="autoDate" class="w-full px-3 py-2 border rounded-lg text-sm bg-white">
+          </div>
+          <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+            <input type="checkbox" id="autoReturnOld" checked class="rounded">
+            પહેલાના બાકી પુસ્તકો આપોઆપ જમા કરો
+          </label>
+          <button type="button" onclick="autoAllotMonthly()"
+            class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-bold shadow flex items-center justify-center gap-2">
+            <i data-lucide="shuffle" class="w-4 h-4"></i> દરેકને ૧ પુસ્તક ફાળવો
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="border-b pb-2 mb-4 flex flex-wrap justify-between items-center gap-2">
+          <h2 class="text-base font-bold text-indigo-950 flex items-center gap-2">
+            <i data-lucide="calendar" class="w-5 h-5 text-indigo-600"></i> પુસ્તક ઇસ્યુ / જૂની તારીખની નોંધ (Issue & Backdated Entry)
+          </h2>
+          <span class="text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-medium">
+            * નોંધ: ડેડસ્ટોકમાંથી કમી કરેલા પુસ્તકો અહીં ઇસ્યુ થશે નહીં!
+          </span>
+        </div>
+
+        <form id="issueForm" onsubmit="handleBookIssue(event)" class="space-y-4">
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-indigo-950 mb-1">૧. ધોરણ પસંદ કરો *</label>
+              <select id="issueStdSelect" onchange="onStandardChange()" required 
+                      class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none bg-indigo-50/50 font-semibold text-indigo-900 border-indigo-300">
+                <option value="">-- ધોરણ પસંદ કરો --</option>
+                <option value="1">ધોરણ ૧</option>
+                <option value="2">ધોરણ ૨</option>
+                <option value="3">ધોરણ ૩</option>
+                <option value="4">ધોરણ ૪</option>
+                <option value="5">ધોરણ ૫</option>
+                <option value="6">ધોરણ ૬</option>
+                <option value="7">ધોરણ ૭</option>
+                <option value="8">ધોરણ ૮</option>
+              </select>
+            </div>
+
+            <div class="md:col-span-3">
+              <label class="block text-xs font-bold text-slate-700 mb-1">૨. વિદ્યાર્થી (નામ અથવા G.R. નંબર) *</label>
+              <input list="studentsFilteredList" id="issueStudentInput" required placeholder="દા.ત. 6294 અથવા રમેશ" 
+                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none">
+              <datalist id="studentsFilteredList"></datalist>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3.5">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-slate-700 mb-1">૩. પુસ્તક (માત્ર ઉપલબ્ધ/ચાલુ પુસ્તકો જ આવશે) *</label>
+              <input list="booksList" id="issueBookInput" required placeholder="દા.ત. પંચતંત્ર અથવા B-101" 
+                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none">
+              <datalist id="booksList"></datalist>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">૪. ઇસ્યુ તારીખ *</label>
+              <input type="date" id="issueDateInput" required 
+                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none font-medium">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">૫. જમા તારીખ (જો પરત આવી ગયું હોય):</label>
+              <input type="date" id="pastReturnDateInput" 
+                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none">
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" class="w-full md:w-auto px-8 bg-indigo-700 hover:bg-indigo-800 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 shadow transition text-sm">
+              <i data-lucide="save" class="w-4 h-4"></i> રજીસ્ટરમાં નોંધ સાચવો
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Active Issues Table -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-3 bg-slate-50 border-b flex justify-between items-center">
+          <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <i data-lucide="clock-alert" class="w-4 h-4 text-amber-600"></i> હાલમાં પરત લેવાના બાકી પુસ્તકો
+          </h3>
+          <span id="activeCountBadge" class="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-bold">0 બાકી</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs md:text-sm">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 uppercase text-xs border-b">
+                <th class="p-2.5">G.R. નં</th>
+                <th class="p-2.5">વિદ્યાર્થીનું નામ</th>
+                <th class="p-2.5">ધોરણ</th>
+                <th class="p-2.5">પુસ્તક ક્રમ</th>
+                <th class="p-2.5">પુસ્તકનું નામ</th>
+                <th class="p-2.5">ઇસ્યુ તારીખ</th>
+                <th class="p-2.5 text-center">ક્રિયા</th>
+              </tr>
+            </thead>
+            <tbody id="activeIssuesTable" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 2: ATTRACTIVE REGISTER PRINT VIEW          -->
+    <!-- ============================================== -->
+    <div id="content-register" class="tab-content hidden space-y-4">
+
+      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-3 no-print">
+        <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block">ધોરણ:</label>
+            <select id="regStdFilter" onchange="renderRegisterTable()" class="w-full sm:w-auto text-xs border rounded-lg px-2.5 py-1.5 bg-slate-50 outline-none">
+              <option value="ALL">તમામ ધોરણ</option>
+              <option value="1">ધોરણ ૧</option>
+              <option value="2">ધોરણ ૨</option>
+              <option value="3">ધોરણ ૩</option>
+              <option value="4">ધોરણ ૪</option>
+              <option value="5">ધોરણ ૫</option>
+              <option value="6">ધોરણ ૬</option>
+              <option value="7">ધોરણ ૭</option>
+              <option value="8">ધોરણ ૮</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block">માસ:</label>
+            <select id="regMonthFilter" onchange="renderRegisterTable()" class="w-full sm:w-auto text-xs border rounded-lg px-2.5 py-1.5 bg-slate-50 outline-none">
+              <option value="ALL">તમામ માસ</option>
+              <option value="06">જૂન</option>
+              <option value="07">જુલાઈ</option>
+              <option value="08">ઓગસ્ટ</option>
+              <option value="09">સપ્ટેમ્બર</option>
+              <option value="10">ઓક્ટોબર</option>
+              <option value="11">નવેમ્બર</option>
+              <option value="12">ડિસેમ્બર</option>
+              <option value="01">જાન્યુઆરી</option>
+              <option value="02">ફેબ્રુઆરી</option>
+              <option value="03">માર્ચ</option>
+              <option value="04">એપ્રિલ</option>
+              <option value="05">મે</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block">સ્થિતિ:</label>
+            <select id="regStatusFilter" onchange="renderRegisterTable()" class="w-full sm:w-auto text-xs border rounded-lg px-2.5 py-1.5 bg-slate-50 outline-none">
+              <option value="ALL">બધા જ</option>
+              <option value="ISSUED">ઇસ્યુ (બાકી)</option>
+              <option value="RETURNED">જમા થયેલ</option>
+            </select>
+          </div>
+          <div class="col-span-2 sm:col-span-1">
+            <label class="text-[11px] font-semibold text-slate-500 block">નામ/પુસ્તક પરથી શોધો:</label>
+            <input type="text" id="regSearchInput" oninput="renderRegisterTable()" placeholder="નામ, GR, પુસ્તક..." 
+                   class="w-full sm:w-56 text-xs border rounded-lg px-3 py-1.5 bg-slate-50 outline-none font-medium focus:ring-2 focus:ring-indigo-400">
+          </div>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <button onclick="printSection('content-register')" class="w-full sm:w-auto px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow transition">
+            <i data-lucide="printer" class="w-4 h-4"></i> A4 Landscape પ્રિન્ટ કરો
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Register Document -->
+      <div class="print-card-wrapper bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow border border-slate-300">
+        <div id="registerHeaderMount"></div>
+
+        <div class="overflow-x-auto mt-2">
+          <table class="w-full text-xs border-collapse register-table">
+            <thead>
+              <tr class="bg-indigo-950 text-white font-bold text-center">
+                <th class="p-1.5 w-10">ક્રમ</th>
+                <th class="p-1.5 w-16">G.R. નં</th>
+                <th class="p-1.5 text-left w-44">વિદ્યાર્થીનું પૂરું નામ</th>
+                <th class="p-1.5 w-14">ધોરણ</th>
+                <th class="p-1.5 w-12">રોલ</th>
+                <th class="p-1.5 w-20">પુસ્તક ક્રમ</th>
+                <th class="p-1.5 text-left">પુસ્તકનું નામ</th>
+                <th class="p-1.5 text-left w-32">લેખક / શ્રેણી</th>
+                <th class="p-1.5 w-24">ઇસ્યુ તારીખ</th>
+                <th class="p-1.5 w-24">જમા તારીખ</th>
+                <th class="p-1.5 w-20">વિદ્યાર્થી સહી</th>
+                <th class="p-1.5 w-20">ગ્રંથપાલ સહી</th>
+                <th class="p-1.5 w-16 no-print">ક્રિયા</th>
+              </tr>
+            </thead>
+            <tbody id="registerTableBody" class="text-slate-800 font-medium"></tbody>
+          </table>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-400 flex justify-between items-end text-xs font-bold text-slate-800">
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">પુસ્તકાલય પ્રભારી શિક્ષક</p>
+          </div>
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">વર્ગ શિક્ષકની સહી</p>
+          </div>
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">આચાર્ય શ્રી ની સહી અને સિક્કો</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 3: પુસ્તક ડેડસ્ટોક રજીસ્ટર (DEADSTOCK)      -->
+    <!-- ============================================== -->
+    <div id="content-deadstock" class="tab-content hidden space-y-5">
+
+      <!-- Deadstock Summary Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print">
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm text-center">
+          <span class="text-[11px] font-semibold text-slate-500 block uppercase">કુલ ડેડસ્ટોક પુસ્તકો</span>
+          <span id="statDsTotal" class="text-xl sm:text-2xl font-black text-indigo-900">0</span>
+        </div>
+        <div class="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200 shadow-sm text-center">
+          <span class="text-[11px] font-semibold text-emerald-800 block uppercase">ખરીદેલ પુસ્તકો</span>
+          <span id="statDsPurchased" class="text-xl sm:text-2xl font-black text-emerald-900">0</span>
+        </div>
+        <div class="bg-sky-50/70 p-3.5 rounded-xl border border-sky-200 shadow-sm text-center">
+          <span class="text-[11px] font-semibold text-sky-800 block uppercase">SSA કચેરી પ્રાપ્ત</span>
+          <span id="statDsSSA" class="text-xl sm:text-2xl font-black text-sky-900">0</span>
+        </div>
+        <div class="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 shadow-sm text-center">
+          <span class="text-[11px] font-semibold text-amber-800 block uppercase">સમિતિ/દાતા ભેટ</span>
+          <span id="statDsSMC" class="text-xl sm:text-2xl font-black text-amber-900">0</span>
+        </div>
+        <div class="bg-rose-50/70 p-3.5 rounded-xl border border-rose-200 shadow-sm text-center col-span-2 sm:col-span-1">
+          <span class="text-[11px] font-semibold text-rose-800 block uppercase">કમી કરેલ (Written Off)</span>
+          <span id="statDsDiscarded" class="text-xl sm:text-2xl font-black text-rose-700">0</span>
+        </div>
+      </div>
+
+      <!-- Add New Deadstock Entry Form (Collapsible/Card) -->
+      <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 space-y-3 no-print">
+        <div class="flex items-center justify-between border-b pb-2">
+          <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <i data-lucide="archive-restore" class="w-4 h-4 text-indigo-600"></i> ડેડસ્ટોકમાં નવું પુસ્તક નોંધો (ખરીદી / SSA / સમિતિ ભેટ)
+          </h3>
+          <span class="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold">ડેડસ્ટોક ફોર્મ</span>
+        </div>
+
+        <form onsubmit="handleDeadstockAdd(event)" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">પુસ્તક ક્રમાંક (Accession No) *</label>
+            <input type="text" id="dsBookId" required placeholder="દા.ત. B-101 અથવા 501" 
+                   class="w-full px-3 py-2 border rounded-lg outline-none font-mono font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block font-bold text-slate-700 mb-1">પુસ્તકનું પૂરું નામ (Title) *</label>
+            <input type="text" id="dsBookTitle" required placeholder="દા.ત. સત્યના પ્રયોગો" 
+                   class="w-full px-3 py-2 border rounded-lg outline-none font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">લેખક / પ્રકાશક</label>
+            <input type="text" id="dsBookAuthor" placeholder="દા.ત. ગાંધીજી / નવજીવન" 
+                   class="w-full px-3 py-2 border rounded-lg outline-none bg-slate-50 focus:bg-white">
+          </div>
+          <div>
+            <label class="block font-bold text-indigo-950 mb-1">પ્રાપ્તિ સ્ત્રોત (ક્યાંથી મળ્યું?) *</label>
+            <select id="dsSource" required class="w-full px-3 py-2 border rounded-lg outline-none bg-indigo-50/60 font-semibold text-indigo-900 border-indigo-300">
+              <option value="ખરીદી">શાળા ખરીદી (શાળા ગ્રાન્ટ)</option>
+              <option value="SSA કચેરી">SSA કચેરી દ્વારા પ્રાપ્ત</option>
+              <option value="નગર/જિલ્લા શિક્ષણ સમિતિ">નગર શિક્ષણ સમિતિ / જિલ્લા શિક્ષણ સમિતિ</option>
+              <option value="શાળા સમિતિ">SMC / શાળા સમિતિ દ્વારા</option>
+              <option value="દાતાશ્રી ભેટ">દાતાશ્રી / લોકભાગીદારી ભેટ</option>
+              <option value="અન્ય">અન્ય સ્ત્રોત</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">પ્રાપ્તિ તારીખ (બિલ / જાવક તારીખ)</label>
+            <input type="date" id="dsDate" class="w-full px-3 py-2 border rounded-lg outline-none bg-slate-50 focus:bg-white font-medium">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">કિંમત (રૂ.)</label>
+            <input type="number" step="0.5" id="dsPrice" placeholder="દા.ત. 150" 
+                   class="w-full px-3 py-2 border rounded-lg outline-none bg-slate-50 focus:bg-white">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">બિલ / વાઉચર / પરિપત્ર નં.</label>
+            <input type="text" id="dsBillNo" placeholder="દા.ત. Bill #45 / Ref 12" 
+                   class="w-full px-3 py-2 border rounded-lg outline-none bg-slate-50 focus:bg-white">
+          </div>
+          <div class="sm:col-span-2 md:col-span-4 flex justify-end pt-1">
+            <button type="submit" class="px-6 py-2.5 bg-indigo-800 hover:bg-indigo-900 text-white rounded-lg font-bold shadow flex items-center gap-1.5 transition">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-amber-300"></i> ડેડસ્ટોકમાં નોંધ સાચવો
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Deadstock Filter & Action Toolbar -->
+      <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-3 no-print">
+        <div class="flex flex-wrap items-center gap-2">
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block">સ્ત્રોત ફિલ્ટર:</label>
+            <select id="dsFilterSource" onchange="renderDeadstockTable()" class="text-xs border rounded-lg px-2.5 py-1.5 bg-slate-50 outline-none">
+              <option value="ALL">તમામ સ્ત્રોત</option>
+              <option value="ખરીદી">શાળા ખરીદી</option>
+              <option value="SSA કચેરી">SSA કચેરી</option>
+              <option value="નગર/જિલ્લા શિક્ષણ સમિતિ">નગર/જિલ્લા શિક્ષણ સમિતિ</option>
+              <option value="શાળા સમિતિ">શાળા સમિતિ</option>
+              <option value="દાતાશ્રી ભેટ">દાતાશ્રી ભેટ</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block">સ્થિતિ ફિલ્ટર:</label>
+            <select id="dsFilterStatus" onchange="renderDeadstockTable()" class="text-xs border rounded-lg px-2.5 py-1.5 bg-slate-50 outline-none">
+              <option value="ALL">તમામ (ચાલુ + કમી)</option>
+              <option value="ACTIVE">માત્ર ચાલુ પુસ્તકો</option>
+              <option value="DISCARDED">માત્ર કમી કરેલ પુસ્તકો</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block">શોધો (ક્રમાંક/નામ):</label>
+            <input type="text" id="dsSearchInput" oninput="renderDeadstockTable()" placeholder="પુસ્તક નામ અથવા ક્રમાંક..." 
+                   class="text-xs border rounded-lg px-3 py-1.5 bg-slate-50 outline-none w-52 font-medium">
+          </div>
+        </div>
+        <button onclick="printSection('content-deadstock')" class="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow">
+          <i data-lucide="printer" class="w-4 h-4"></i> ડેડસ્ટોક રજીસ્ટર પ્રિન્ટ (A4 Landscape)
+        </button>
+      </div>
+
+      <!-- Printable Deadstock Register Document -->
+      <div class="print-card-wrapper bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow border border-slate-300">
+        <div id="deadstockHeaderMount"></div>
+
+        <div class="overflow-x-auto mt-2">
+          <table class="w-full text-xs border-collapse register-table">
+            <thead>
+              <tr class="bg-indigo-950 text-white font-bold text-center">
+                <th class="p-1.5 w-10">ક્રમ</th>
+                <th class="p-1.5 w-20">પુસ્તક ક્રમાંક</th>
+                <th class="p-1.5 text-left w-52">પુસ્તકનું નામ</th>
+                <th class="p-1.5 text-left w-36">લેખક / પ્રકાશક</th>
+                <th class="p-1.5 w-28">પ્રાપ્તિ સ્ત્રોત</th>
+                <th class="p-1.5 w-20">પ્રાપ્તિ તારીખ</th>
+                <th class="p-1.5 w-16">કિંમત રૂ.</th>
+                <th class="p-1.5 w-24">બિલ / પરિપત્ર નં</th>
+                <th class="p-1.5 w-20">સ્થિતિ</th>
+                <th class="p-1.5 w-32 text-left">કમી વિગત / કારણ</th>
+                <th class="p-1.5 w-20 no-print">ક્રિયા</th>
+              </tr>
+            </thead>
+            <tbody id="deadstockTableBody" class="text-slate-800 font-medium"></tbody>
+          </table>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-400 flex justify-between items-end text-xs font-bold text-slate-800">
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">ગ્રંથપાલ / પુસ્તકાલય પ્રભારી</p>
+          </div>
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">ડેડસ્ટોક સમિતિ સભ્ય</p>
+          </div>
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">આચાર્ય શ્રી ની સહી અને સિક્કો</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 4: GUJARATI CAMERA OCR & SCANNER           -->
+    <!-- ============================================== -->
+    <div id="content-camera-entry" class="tab-content hidden space-y-6 no-print">
+      <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+
+        <div class="border-b pb-3 flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <h3 class="font-black text-indigo-950 text-base flex items-center gap-2">
+              <i data-lucide="scan-line" class="w-5 h-5 text-emerald-600"></i> ગુજરાતી પુસ્તક ફોટો સ્કેન & OCR
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">પુસ્તકના કવર પેજનો ફોટો પાડીને અક્ષરો સ્કેન કરો</p>
+          </div>
+          <span class="text-xs bg-emerald-100 text-emerald-900 border border-emerald-300 px-3 py-1 rounded-full font-bold">
+            ગુજરાતી OCR (guj + eng)
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+
+          <div class="space-y-3">
+            <div class="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center bg-slate-50 flex flex-col items-center justify-center min-h-[220px] relative">
+              <canvas id="ocrCanvas" class="hidden max-h-60 object-contain rounded-lg shadow border"></canvas>
+              <img id="bookPhotoPreview" src="" alt="પુસ્તક ફોટો પ્રીવ્યુ" class="hidden max-h-60 object-contain rounded-lg shadow border">
+              <div id="photoPlaceholder" class="space-y-2 text-slate-500 py-6">
+                <i data-lucide="camera" class="w-12 h-12 mx-auto text-indigo-400"></i>
+                <p class="text-xs font-semibold">મોબાઈલ કેમેરાથી ફોટો પાડવા નીચે ક્લિક કરો</p>
+              </div>
+            </div>
+
+            <div id="filterControls" class="hidden bg-indigo-50/70 p-2.5 rounded-lg border border-indigo-200 text-xs flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="chkEnhanceGujarati" checked onchange="reapplyFilter()" class="rounded text-indigo-600">
+                <label for="chkEnhanceGujarati" class="font-bold text-indigo-900 cursor-pointer text-[11px] sm:text-xs">
+                  ગુજરાતી માત્રાઓ સ્પષ્ટ કરવા ફિલ્ટર
+                </label>
+              </div>
+              <button onclick="rotateImage()" class="px-2.5 py-1 bg-white border border-indigo-300 text-indigo-800 rounded text-xs font-semibold hover:bg-indigo-100 flex items-center gap-1">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> ફેરવો
+              </button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2">
+              <label class="flex-1 py-2.5 px-4 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold text-center cursor-pointer shadow flex items-center justify-center gap-2 transition">
+                <i data-lucide="camera" class="w-4 h-4"></i> ગુજરાતી પુસ્તકનો ફોટો લો
+                <input type="file" id="cameraFileInput" accept="image/*" capture="environment" onchange="handleBookPhotoSelected(event)" class="hidden">
+              </label>
+              <button onclick="runGujaratiOCRScan()" id="btnRunOCR" class="py-2.5 px-5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow flex items-center justify-center gap-1.5 transition" disabled>
+                <i data-lucide="scan-text" class="w-4 h-4"></i> લખાણ સ્કેન કરો
+              </button>
+            </div>
+
+            <div id="ocrStatusBox" class="hidden bg-slate-100 p-3 rounded-lg border text-xs space-y-1.5">
+              <div class="flex justify-between items-center font-bold text-slate-700">
+                <span id="ocrStatusText">ગુજરાતી અક્ષરો ઓળખાઈ રહ્યા છે...</span>
+                <span id="ocrProgressPercent">0%</span>
+              </div>
+              <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                <div id="ocrProgressBar" class="bg-emerald-600 h-full w-0 transition-all duration-300"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3.5 shadow-sm">
+            <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wide border-b pb-1">
+              પુસ્તકની વિગત (ચકાસો અને રજીસ્ટરમાં સાચવો)
+            </h4>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">પુસ્તક ક્રમ / Accession No *</label>
+              <input type="text" id="cameraBookId" placeholder="દા.ત. B-105" 
+                     class="w-full px-3 py-2 border rounded-lg text-sm bg-white font-mono outline-none font-bold">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">પુસ્તકનું નામ (Title) *</label>
+              <textarea id="cameraBookTitle" rows="2" placeholder="પુસ્તકનું નામ..." 
+                        class="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none font-medium"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">લેખક / શ્રેણી</label>
+              <input type="text" id="cameraBookAuthor" placeholder="દા.ત. બાળવાર્તા" 
+                     class="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">પ્રાપ્તિ સ્ત્રોત</label>
+              <select id="cameraBookSource" class="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none font-medium">
+                <option value="SSA કચેરી">SSA કચેરી દ્વારા પ્રાપ્ત</option>
+                <option value="નગર/જિલ્લા શિક્ષણ સમિતિ">નગર શિક્ષણ સમિતિ / જિલ્લા શિક્ષણ સમિતિ</option>
+                <option value="ખરીદી">શાળા ખરીદી</option>
+                <option value="શાળા સમિતિ">શાળા સમિતિ</option>
+                <option value="દાતાશ્રી ભેટ">દાતાશ્રી ભેટ</option>
+              </select>
+            </div>
+
+            <div class="pt-2">
+              <button onclick="saveCameraBookToRegister()" class="w-full py-2.5 bg-indigo-800 hover:bg-indigo-900 text-white rounded-lg text-xs font-bold shadow flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> ડેડસ્ટોકમાં ઉમેરો (Save Book)
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 5: MANUAL STUDENT & BOOK ENTRY             -->
+    <!-- ============================================== -->
+    <div id="content-manual-entry" class="tab-content hidden space-y-6 no-print">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Manual Student Add Form -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between border-b pb-2">
+            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-5 h-5 text-indigo-600"></i> નવો વિદ્યાર્થી મેન્યુઅલ ઉમેરો
+            </h3>
+            <span class="text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-bold">વિદ્યાર્થી માસ્ટર</span>
+          </div>
+
+          <form onsubmit="handleManualStudentAdd(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">G.R. નંબર *</label>
+              <input type="text" id="manualStudentGr" required placeholder="દા.ત. 6294" 
+                     class="w-full px-3 py-2 border rounded-lg text-sm outline-none font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">વિદ્યાર્થીનું પૂરું નામ *</label>
+              <input type="text" id="manualStudentName" required placeholder="દા.ત. પટેલ આયુષ" 
+                     class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">ધોરણ *</label>
+                <select id="manualStudentStd" required class="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-white">
+                  <option value="1">ધોરણ ૧</option>
+                  <option value="2">ધોરણ ૨</option>
+                  <option value="3">ધોરણ ૩</option>
+                  <option value="4">ધોરણ ૪</option>
+                  <option value="5">ધોરણ ૫</option>
+                  <option value="6">ધોરણ ૬</option>
+                  <option value="7">ધોરણ ૭</option>
+                  <option value="8">ધોરણ ૮</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">રોલ નંબર (વૈકલ્પિક)</label>
+                <input type="text" id="manualStudentRoll" placeholder="દા.ત. 1" 
+                       class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+              </div>
+            </div>
+            <button type="submit" class="w-full py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold shadow flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="check" class="w-4 h-4"></i> વિદ્યાર્થી સેવ કરો
+            </button>
+          </form>
+        </div>
+
+        <!-- Manual Book Add Form (Connects to Deadstock) -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between border-b pb-2">
+            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="book-plus" class="w-5 h-5 text-emerald-600"></i> નવું પુસ્તક માસ્ટર/ડેડસ્ટોકમાં ઉમેરો
+            </h3>
+            <span class="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold">પુસ્તક માસ્ટર</span>
+          </div>
+
+          <form onsubmit="handleManualBookAdd(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">પુસ્તક ક્રમાંક / Accession No *</label>
+              <input type="text" id="manualBookId" required placeholder="દા.ત. B-101" 
+                     class="w-full px-3 py-2 border rounded-lg text-sm outline-none font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">પુસ્તકનું નામ (Title) *</label>
+              <input type="text" id="manualBookTitle" required placeholder="દા.ત. પંચતંત્ર" 
+                     class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">લેખક / શ્રેણી</label>
+                <input type="text" id="manualBookAuthor" placeholder="દા.ત. વિષ્ણુ શર્મા" 
+                       class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">પ્રાપ્તિ સ્ત્રોત</label>
+                <select id="manualBookSource" class="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-white">
+                  <option value="ખરીદી">શાળા ખરીદી</option>
+                  <option value="SSA કચેરી">SSA કચેરી</option>
+                  <option value="નગર/જિલ્લા શિક્ષણ સમિતિ">નગર શિક્ષણ સમિતિ / જિલ્લા શિક્ષણ સમિતિ</option>
+                  <option value="શાળા સમિતિ">શાળા સમિતિ</option>
+                  <option value="દાતાશ્રી ભેટ">દાતાશ્રી ભેટ</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="check" class="w-4 h-4"></i> પુસ્તક સેવ કરો
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 6: REPORTS & ANALYTICS                     -->
+    <!-- ============================================== -->
+    <div id="content-reports" class="tab-content hidden space-y-6">
+
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 no-print">
+        <div class="flex items-center gap-3">
+          <label class="text-xs md:text-sm font-semibold text-slate-700">શૈક્ષણિક સત્ર:</label>
+          <select id="reportYearFilter" onchange="generateReports()" class="border px-3 py-1.5 rounded-lg text-xs md:text-sm bg-white outline-none">
+          </select>
+        </div>
+        <button onclick="printSection('content-reports')" class="px-4 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow">
+          <i data-lucide="printer" class="w-4 h-4"></i> અહેવાલ પ્રિન્ટ (A4 Landscape)
+        </button>
+      </div>
+
+      <!-- Printable Report Container -->
+      <div class="print-card-wrapper bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow border border-slate-300">
+        <div id="reportsHeaderMount"></div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 my-4 no-print">
+          <div class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase">કુલ વિદ્યાર્થીઓ</p>
+            <h3 id="statTotalStudents" class="text-2xl font-black text-indigo-700 mt-1">0</h3>
+          </div>
+          <div class="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase">ચાલુ/ઉપલબ્ધ પુસ્તકો</p>
+            <h3 id="statTotalBooks" class="text-2xl font-black text-emerald-700 mt-1">0</h3>
+          </div>
+          <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-100 text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase">કુલ વાંચેલા પુસ્તકો</p>
+            <h3 id="statTotalRead" class="text-2xl font-black text-amber-600 mt-1">0</h3>
+          </div>
+          <div class="bg-purple-50/50 p-4 rounded-xl border border-purple-100 text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase">સક્રિય વાચક વિદ્યાર્થીઓ</p>
+            <h3 id="statActiveReaders" class="text-2xl font-black text-purple-700 mt-1">0</h3>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mt-2">
+          <table class="w-full text-center border-collapse text-xs md:text-sm register-table">
+            <thead id="matrixHead" class="bg-indigo-950 text-white font-semibold"></thead>
+            <tbody id="matrixBody" class="divide-y divide-slate-100 font-medium"></tbody>
+            <tfoot id="matrixFoot" class="bg-amber-100 font-bold border-t text-indigo-950"></tfoot>
+          </table>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-400 flex justify-between items-end text-xs font-bold text-slate-800">
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">ગ્રંથપાલ / પ્રભારી શિક્ષક</p>
+          </div>
+          <div class="text-center w-52">
+            <div class="h-10 border-b border-dashed border-slate-500"></div>
+            <p class="mt-1.5">આચાર્ય શ્રી ની સહી અને સિક્કો</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 7: STUDENT READING PORTFOLIO CARD          -->
+    <!-- ============================================== -->
+    <div id="content-student-card" class="tab-content hidden space-y-6">
+
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-end no-print">
+        <div class="flex-1 min-w-[240px]">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">વિદ્યાર્થીના નામ અથવા G.R. નં પરથી શોધો:</label>
+          <input list="studentsAllList" id="studentCardSearchInput" placeholder="દા.ત. 6294 અથવા નામ..." 
+                 class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs md:text-sm outline-none">
+          <datalist id="studentsAllList"></datalist>
+        </div>
+        <button onclick="loadStudentCard()" class="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs md:text-sm font-semibold flex items-center gap-1.5 shadow">
+          <i data-lucide="search" class="w-4 h-4"></i> વિદ્યાર્થી કાર્ડ જુઓ
+        </button>
+        <button onclick="printSection('content-student-card')" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs md:text-sm font-semibold flex items-center gap-1 shadow">
+          <i data-lucide="printer" class="w-4 h-4"></i> પ્રિન્ટ કાર્ડ
+        </button>
+      </div>
+
+      <!-- Printable Card Document -->
+      <div id="studentCardContainer" class="print-card-wrapper bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow border border-slate-300 space-y-5 hidden">
+        <div id="studentCardHeaderMount"></div>
+
+        <div class="bg-indigo-50/70 border border-indigo-200 p-4 rounded-xl flex flex-wrap justify-between items-center gap-4">
+          <div>
+            <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block">વિદ્યાર્થી પ્રોફાઇલ</span>
+            <h2 id="cardStudentName" class="text-xl md:text-2xl font-black text-indigo-950 mt-0.5">-</h2>
+            <p class="text-xs text-slate-700 mt-1">
+              G.R. નંબર: <span id="cardStudentGr" class="font-bold text-slate-900">-</span> | 
+              ધોરણ: <span id="cardStudentStd" class="font-bold text-slate-900">-</span> | 
+              રોલ નં: <span id="cardStudentRoll" class="font-bold text-slate-900">-</span>
+            </p>
+          </div>
+          <div class="bg-white border border-indigo-200 px-5 py-2 rounded-xl text-center shadow-sm">
+            <span class="text-xs font-semibold text-indigo-700 block">વાંચેલા કુલ પુસ્તકો</span>
+            <span id="cardStudentTotalBooks" class="text-3xl font-black text-indigo-950">0</span>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-800 mb-2 text-xs md:text-sm">વાંચેલા તમામ પુસ્તકોની વિગત:</h4>
+          <table class="w-full text-left border-collapse text-xs register-table">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 font-bold">
+                <th class="p-2 w-10 text-center">ક્રમ</th>
+                <th class="p-2 w-20">પુસ્તક ક્રમ</th>
+                <th class="p-2">પુસ્તકનું નામ</th>
+                <th class="p-2">લેખક / શ્રેણી</th>
+                <th class="p-2 w-24">ઇસ્યુ તારીખ</th>
+                <th class="p-2 w-24">જમા તારીખ</th>
+                <th class="p-2 w-20 text-center">સ્થિતિ</th>
+              </tr>
+            </thead>
+            <tbody id="cardBookHistoryBody"></tbody>
+          </table>
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-slate-300 flex justify-between text-xs font-bold text-slate-700">
+          <p>વર્ગ શિક્ષકની સહી: ______________</p>
+          <p>આચાર્યની સહી અને સિક્કો: ______________</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 8: MASTER EXCEL DATA IMPORT                -->
+    <!-- ============================================== -->
+    <div id="content-masters" class="tab-content hidden space-y-6 no-print">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Students Excel -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between border-b pb-2">
+            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="users" class="w-5 h-5 text-indigo-600"></i> વિદ્યાર્થી Excel Import
+            </h3>
+            <span id="badgeStudentCount" class="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">0 રેકોર્ડ</span>
+          </div>
+          <p class="text-xs text-slate-600">Excel હેડર: <span class="font-mono bg-slate-100 px-1 py-0.5 text-indigo-700 rounded font-bold">GR_NO</span>, <span class="font-mono bg-slate-100 px-1 py-0.5 text-indigo-700 rounded font-bold">STUDENT_NAME</span>, <span class="font-mono bg-slate-100 px-1 py-0.5 text-indigo-700 rounded font-bold">STANDARD</span>, <span class="font-mono bg-slate-100 px-1 py-0.5 text-indigo-700 rounded font-bold">ROLL_NO</span></p>
+          <div class="flex items-center gap-2">
+            <input type="file" id="studentExcelFile" accept=".xlsx, .xls, .csv" class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border rounded-lg w-full">
+            <button onclick="importStudentsExcel()" class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-semibold whitespace-nowrap">
+              અપલોડ
+            </button>
+          </div>
+          <div class="flex justify-between items-center pt-2">
+            <button onclick="downloadStudentTemplate()" class="text-xs text-indigo-600 hover:underline flex items-center gap-1 font-semibold">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> વિદ્યાર્થી નમૂનો ડાઉનલોડ
+            </button>
+            <button onclick="clearStudentsMaster()" class="text-xs text-rose-600 hover:underline">ડેટા સાફ કરો</button>
+          </div>
+        </div>
+
+        <!-- Books Excel (Deadstock Import) -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between border-b pb-2">
+            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="library" class="w-5 h-5 text-emerald-600"></i> પુસ્તક ડેડસ્ટોક Excel Import
+            </h3>
+            <span id="badgeBookCount" class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">0 પુસ્તક</span>
+          </div>
+          <p class="text-xs text-slate-600">Excel હેડર: <span class="font-mono bg-slate-100 px-1 py-0.5 text-emerald-700 rounded font-bold">BOOK_ID</span>, <span class="font-mono bg-slate-100 px-1 py-0.5 text-emerald-700 rounded font-bold">BOOK_TITLE</span>, <span class="font-mono bg-slate-100 px-1 py-0.5 text-emerald-700 rounded font-bold">AUTHOR</span>, <span class="font-mono bg-slate-100 px-1 py-0.5 text-emerald-700 rounded font-bold">SOURCE</span></p>
+          <div class="flex items-center gap-2">
+            <input type="file" id="bookExcelFile" accept=".xlsx, .xls, .csv" class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border rounded-lg w-full">
+            <button onclick="importBooksExcel()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold whitespace-nowrap">
+              અપલોડ
+            </button>
+          </div>
+          <div class="flex justify-between items-center pt-2">
+            <button onclick="downloadBookTemplate()" class="text-xs text-emerald-600 hover:underline flex items-center gap-1 font-semibold">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> પુસ્તક નમૂનો ડાઉનલોડ
+            </button>
+            <button onclick="clearBooksMaster()" class="text-xs text-rose-600 hover:underline">ડેટા સાફ કરો</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Demo -->
+      <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between">
+        <div>
+          <h4 class="font-bold text-amber-950 text-sm">સેમ્પલ / ડેમો ડેટા લોડ કરવો છે?</h4>
+          <p class="text-xs text-amber-800">તરત ટેસ્ટિંગ કરવા માટે સેમ્પલ રેકોર્ડ્સ લોડ કરો.</p>
+        </div>
+        <button onclick="loadSampleDemoData()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow transition">
+          ડેમો ડેટા લોડ કરો
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 9: SETTINGS & GOOGLE SHEETS SETUP          -->
+    <!-- ============================================== -->
+    <div id="content-settings" class="tab-content hidden space-y-6 no-print">
+
+      <!-- School Branding Details -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <h3 class="font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+          <i data-lucide="building-2" class="w-5 h-5 text-indigo-600"></i> શાળા વિગત અને પ્રિન્ટ હેડિંગ સેટિંગ્સ
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">શાળાનું પૂરું નામ 🔒 (લાઇસન્સ મુજબ લૉક):</label>
+            <input type="text" id="settingSchoolName" readonly class="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-100 text-slate-600 cursor-not-allowed" value="શાળાનું નામ">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">DISE CODE 🔒 (લાઇસન્સ મુજબ લૉક):</label>
+            <input type="text" id="settingDiseCode" readonly class="w-full px-3 py-2 border rounded-lg text-sm outline-none font-mono bg-slate-100 text-slate-600 cursor-not-allowed" value="">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">શાળાનું સરનામું (તાલુકો, જિલ્લો):</label>
+            <input type="text" id="settingSchoolAddress" class="w-full px-3 py-2 border rounded-lg text-sm outline-none" value="તા. ____, જી. ____ (ગુજરાત)">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">શાળા / PM-SHRI લોગો (છબી પસંદ કરો):</label>
+            <input type="file" id="settingLogoFile" accept="image/*" onchange="handleLogoUpload(event)" class="w-full text-xs border rounded-lg py-1 px-2">
+          </div>
+        </div>
+        <button onclick="saveSchoolSettings()" class="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold shadow">
+          શાળા વિગતો સાચવો
+        </button>
+      </div>
+
+      <!-- License Info & Change Password -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between border-b pb-2">
+          <h3 class="font-bold text-slate-800 flex items-center gap-2">
+            <i data-lucide="badge-check" class="w-5 h-5 text-indigo-600"></i> લાઇસન્સ અને પાસવર્ડ
+          </h3>
+          <button onclick="licenseLogout()" class="text-xs text-rose-600 hover:underline font-semibold">લૉગઆઉટ</button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div class="bg-slate-50 border rounded-lg p-2.5"><span class="text-slate-500 block">શાળા</span><b id="licInfoSchool" class="text-slate-900">-</b></div>
+          <div class="bg-slate-50 border rounded-lg p-2.5"><span class="text-slate-500 block">DISE કોડ</span><b id="licInfoDise" class="font-mono text-slate-900">-</b></div>
+          <div class="bg-slate-50 border rounded-lg p-2.5"><span class="text-slate-500 block">લાઇસન્સ વર્ષ</span><b id="licInfoYear" class="text-slate-900">-</b></div>
+          <div class="bg-slate-50 border rounded-lg p-2.5"><span class="text-slate-500 block">માન્યતા</span><b id="licInfoExpiry" class="text-slate-900">-</b></div>
+        </div>
+        <form onsubmit="handleChangePassword(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end text-xs">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">હાલનો પાસવર્ડ</label>
+            <input type="password" id="cpOld" required autocomplete="current-password" class="w-full px-3 py-2 border rounded-lg outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">નવો પાસવર્ડ</label>
+            <input type="password" id="cpNew" required minlength="6" autocomplete="new-password" class="w-full px-3 py-2 border rounded-lg outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">નવો પાસવર્ડ ફરી</label>
+            <input type="password" id="cpNew2" required minlength="6" autocomplete="new-password" class="w-full px-3 py-2 border rounded-lg outline-none">
+          </div>
+          <button type="submit" id="cpBtn" class="py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg font-bold shadow">પાસવર્ડ બદલો</button>
+        </form>
+      </div>
+
+      <!-- JSON Backup & Restore -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between border-b pb-2">
+          <h3 class="font-bold text-slate-800 flex items-center gap-2">
+            <i data-lucide="file-json" class="w-5 h-5 text-emerald-600"></i> ડેટા બેકઅપ અને રિસ્ટોર (JSON ફાઇલ)
+          </h3>
+          <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Offline Backup</span>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          તમામ ડેટા (વિદ્યાર્થીઓ, ડેડસ્ટોક પુસ્તકો, ઇસ્યુ રજીસ્ટર અને શાળાની વિગતો) એક <b>.json</b> ફાઇલમાં ડાઉનલોડ થશે.
+          નવા ફોન/કમ્પ્યુટરમાં કે બ્રાઉઝર ડેટા ભૂંસાઈ જાય ત્યારે એ જ ફાઇલ અપલોડ કરીને બધો ડેટા પાછો મેળવી શકાશે.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="downloadJsonBackup()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5">
+            <i data-lucide="file-down" class="w-3.5 h-3.5"></i> JSON બેકઅપ ડાઉનલોડ કરો
+          </button>
+          <label class="cursor-pointer px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5">
+            <i data-lucide="file-up" class="w-3.5 h-3.5"></i> JSON ફાઇલ અપલોડ કરી ડેટા પાછો લાવો
+            <input type="file" accept=".json,application/json" onchange="importJsonBackup(event)" class="hidden">
+          </label>
+        </div>
+        <p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+          ⚠️ અપલોડ કરવાથી હાલનો ડેટા બેકઅપ ફાઇલના ડેટાથી બદલાઈ જશે. અપલોડ પહેલાં હાલનો ડેટા ડાઉનલોડ કરી લેવો સલાહભર્યો છે.
+          નિયમિત (દા.ત. અઠવાડિયે/દર મહિને) બેકઅપ લેતા રહો.
+        </p>
+      </div>
+
+      <!-- Issue_Register Password Protected Clear Section -->
+      <div class="bg-rose-50/80 border-2 border-rose-200 p-5 rounded-xl space-y-3 shadow-sm">
+        <div class="flex items-center justify-between border-b border-rose-200 pb-2">
+          <h4 class="font-bold text-rose-900 text-sm flex items-center gap-2">
+            <i data-lucide="shield-alert" class="w-5 h-5 text-rose-600"></i> Issue_Register (પુસ્તક આપ-લે ડેટા) રિમૂવ કરો
+          </h4>
+          <span class="text-[11px] bg-rose-200 text-rose-900 font-bold px-2.5 py-0.5 rounded-full">સુરક્ષા પાસવર્ડ જરૂરી</span>
+        </div>
+        <p class="text-xs text-rose-800 leading-relaxed">
+          આ બટન દબાવવાથી માત્ર <b>Issue_Register (પુસ્તક આપ-લે / વાંચન ઇતિહાસ)</b> નો તમામ ડેટા રિમૂવ થઈ જશે. શાળાના વિદ્યાર્થીઓ અને પુસ્તક ડેડસ્ટોક સુરક્ષિત રહેશે. ડેટા રિમૂવ કરવા માટે પાસવર્ડ નાખવો પડશે.
+        </p>
+        <div class="flex justify-end pt-1">
+          <button onclick="clearIssueRegisterWithPassword()" class="px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5 transition">
+            <i data-lucide="trash-2" class="w-4 h-4"></i> Issue_Register ડેટા રિમૂવ કરો (Clear Register)
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Modal for Writing off a book (કમી કરવા માટે પોપ-અપ) -->
+  <div id="writeOffModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-rose-800 text-sm flex items-center gap-2">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i> પુસ્તક ડેડસ્ટોકમાંથી કમી કરો
+        </h3>
+        <button onclick="closeWriteOffModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <div class="bg-rose-50 p-3 rounded-lg text-xs text-rose-900">
+        <p><b>ચેતવણી:</b> કમી કરેલું પુસ્તક ભવિષ્યમાં કોઈપણ વિદ્યાર્થીને <b>ઇસ્યુ કરી શકાશે નહીં</b>.</p>
+        <p class="mt-1">પુસ્તક: <span id="modalBookTitle" class="font-bold">-</span> (<span id="modalBookId" class="font-mono font-bold">-</span>)</p>
+      </div>
+
+      <form onsubmit="confirmWriteOff(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="modalTargetBookId">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">કમી કર્યા તારીખ *</label>
+          <input type="date" id="modalWriteOffDate" required class="w-full px-3 py-2 border rounded-lg outline-none font-medium">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">કમી કરવાનું કારણ *</label>
+          <select id="modalWriteOffReason" required class="w-full px-3 py-2 border rounded-lg outline-none bg-white font-medium">
+            <option value="ફાટી ગયેલ / ઉપયોગમાં ન લઈ શકાય તેવું">ફાટી ગયેલ / જીર્ણ થયેલ</option>
+            <option value="નષ્ટ થયેલ / પલળી ગયેલ">પાણી/ઉધઈથી નષ્ટ થયેલ</option>
+            <option value="ગુમ થયેલ / પરત ન મળેલ">ગુમ થયેલ</option>
+            <option value="અભ્યાસક્રમ બહારનું / અપ્રસ્તુત">અપ્રસ્તુત સાહિત્ય</option>
+            <option value="અન્ય કારણ">અન્ય કારણ</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">SMC ઠરાવ નં. / મંજૂરી સંદર્ભ</label>
+          <input type="text" id="modalWriteOffRef" placeholder="દા.ત. ઠરાવ નં. ૫, તા. ૧૫-૦૮-૨૦૨૬" 
+                 class="w-full px-3 py-2 border rounded-lg outline-none">
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t">
+          <button type="button" onclick="closeWriteOffModal()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-semibold hover:bg-slate-300">
+            રદ કરો
+          </button>
+          <button type="submit" class="px-5 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold shadow">
+            પુસ્તક કમી કરો (Confirm)
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t py-2.5 text-center text-xs text-slate-500 no-print">
+    શાળા ગ્રંથાલય પુસ્તક રજીસ્ટર સોફ્ટવેર • ડેડસ્ટોક મેનેજમેન્ટ અને JSON બેકઅપ
+  </footer>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    // ===================================================
+    // LICENSE / LOGIN SYSTEM (Google Apps Script સર્વર)
+    // ===================================================
+    const LICENSE_API_URL = "https://script.google.com/macros/s/AKfycbwxzeS113QVuQvS8VzA9fzqLQO9oKLe9h6bRrtk3Irg6WusWtNOkwAgCB156Xo1uTE2/exec";   // license_server.gs ની Web App URL
+    const OFFLINE_GRACE_DAYS = 14;                                   // ઇન્ટરનેટ વગર વધુમાં વધુ કેટલા દિવસ ચાલે
+    let licenseSession = JSON.parse(localStorage.getItem('lib_license_session') || 'null');
+
+    const LICENSE_MESSAGES = {
+      NOT_FOUND: 'આ DISE કોડ માટે લાઇસન્સ મળ્યું નથી. સોફ્ટવેર ખરીદવા માટે સંપર્ક કરો.',
+      WRONG_PASSWORD: 'પાસવર્ડ ખોટો છે.',
+      WRONG_RECOVERY: 'રિકવરી કોડ ખોટો છે.',
+      EXPIRED: 'તમારું લાઇસન્સ પૂરું થઈ ગયું છે. રિન્યુ કરાવવા માટે સંપર્ક કરો.',
+      BLOCKED: 'આ લાઇસન્સ બ્લૉક કરેલ છે. સંપર્ક કરો.',
+      TOO_MANY_ATTEMPTS: 'ખોટા પ્રયાસો વધુ થઈ ગયા છે. અનલૉક કરાવવા સંપર્ક કરો.',
+      NETWORK: 'ઇન્ટરનેટ/સર્વર સાથે જોડાણ થઈ શક્યું નહીં. કનેક્શન ચકાસીને ફરી પ્રયાસ કરો.',
+      NO_SERVER: 'લાઇસન્સ સર્વર URL સેટ કરેલ નથી (LICENSE_API_URL).',
+      BAD_REQUEST: 'અમાન્ય વિનંતી.',
+      SERVER_ERROR: 'સર્વર ભૂલ. થોડી વાર પછી ફરી પ્રયાસ કરો.'
+    };
+
+    function localToday() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    async function licenseApi(params) {
+      if (!LICENSE_API_URL || LICENSE_API_URL.indexOf('PASTE_') === 0) return { status: 'error', code: 'NO_SERVER' };
+      const qs = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+      try {
+        const r = await fetch(LICENSE_API_URL + '?' + qs, { method: 'GET' });
+        if (!r.ok) throw new Error('http ' + r.status);
+        return await r.json();
+      } catch (err) {
+        return { status: 'error', code: 'NETWORK' };
+      }
+    }
+
+    function licenseErrText(res) {
+      let t = LICENSE_MESSAGES[res.code] || 'અજાણી ભૂલ.';
+      if (res.left !== undefined) t += ` (બાકી પ્રયાસ: ${res.left})`;
+      return t;
+    }
+
+    function showLicenseMsg(text, type) {
+      const el = document.getElementById('licMsg');
+      if (!el) return;
+      if (!text) { el.classList.add('hidden'); return; }
+      el.className = 'text-xs rounded-lg p-2.5 font-semibold ' +
+        (type === 'ok' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200');
+      el.innerText = text;
+    }
+
+    function showLicenseTab(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('licLoginForm').classList.toggle('hidden', !isLogin);
+      document.getElementById('licResetForm').classList.toggle('hidden', isLogin);
+      document.getElementById('licTabLogin').className = 'py-2 rounded-md ' + (isLogin ? 'bg-white text-indigo-900 shadow' : 'text-slate-600');
+      document.getElementById('licTabReset').className = 'py-2 rounded-md ' + (!isLogin ? 'bg-white text-indigo-900 shadow' : 'text-slate-600');
+      showLicenseMsg('');
+    }
+
+    function lockApp(msg, tab) {
+      const lastDise = (licenseSession && licenseSession.dise) || localStorage.getItem('lib_last_dise') || '';
+      document.getElementById('licenseOverlay').classList.remove('hidden');
+      showLicenseTab(tab || 'login');
+      document.getElementById('licDise').value = lastDise;
+      document.getElementById('licResetDise').value = lastDise;
+      document.getElementById('licPassword').value = '';
+      if (msg) showLicenseMsg(msg, 'error');
+    }
+
+    function unlockApp() {
+      document.getElementById('licenseOverlay').classList.add('hidden');
+      applyLicense();
+    }
+
+    function saveLicenseSession() {
+      localStorage.setItem('lib_license_session', JSON.stringify(licenseSession));
+    }
+
+    function applyLicense() {
+      if (!licenseSession) return;
+      schoolSettings.name = licenseSession.school;
+      schoolSettings.dise = licenseSession.dise;
+      localStorage.setItem('lib_school_settings', JSON.stringify(schoolSettings));
+      loadSettingsToUI();
+      renderAllHeaders();
+
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+      set('licInfoSchool', licenseSession.school);
+      set('licInfoDise', licenseSession.dise);
+      set('licInfoYear', licenseSession.year || '-');
+      const daysLeft = Math.ceil((new Date(licenseSession.expiry + 'T23:59:59') - new Date()) / 86400000);
+      set('licInfoExpiry', `${licenseSession.expiry} સુધી (${daysLeft} દિવસ બાકી)`);
+
+      if (daysLeft <= 15 && daysLeft >= 0 && !sessionStorage.getItem('lib_exp_warned')) {
+        sessionStorage.setItem('lib_exp_warned', '1');
+        alert(`⚠️ તમારું લાઇસન્સ ${daysLeft} દિવસમાં પૂરું થશે (${licenseSession.expiry}). સમયસર રિન્યુ કરાવો.`);
+      }
+    }
+
+    async function handleLicenseLogin(e) {
+      e.preventDefault();
+      const dise = document.getElementById('licDise').value.trim();
+      const pw = document.getElementById('licPassword').value;
+      const btn = document.getElementById('licLoginBtn');
+      btn.disabled = true; btn.innerText = 'ચકાસી રહ્યા છે...';
+      try {
+        const pwT = pw.trim();
+        const res = await licenseApi({ action: 'login', dise: dise, pw: pwT });
+        if (res.status !== 'ok') { showLicenseMsg(licenseErrText(res), 'error'); return; }
+        licenseSession = { dise: res.dise || dise, school: res.school, year: res.year, expiry: res.expiry, pw: pwT, verified_at: Date.now() };
+        saveLicenseSession();
+        localStorage.setItem('lib_last_dise', licenseSession.dise);
+        showLicenseMsg('');
+        unlockApp();
+      } finally {
+        btn.disabled = false; btn.innerText = 'લૉગિન કરો';
+      }
+    }
+
+    async function handleLicenseReset(e) {
+      e.preventDefault();
+      const dise = document.getElementById('licResetDise').value.trim();
+      const code = document.getElementById('licRecovery').value;
+      const np = document.getElementById('licNewPw').value;
+      const np2 = document.getElementById('licNewPw2').value;
+      if (np.trim().length < 6) { showLicenseMsg('નવો પાસવર્ડ ઓછામાં ઓછા ૬ અક્ષરનો હોવો જોઈએ.', 'error'); return; }
+      if (np !== np2) { showLicenseMsg('બંને પાસવર્ડ સરખા નથી.', 'error'); return; }
+      const btn = document.getElementById('licResetBtn');
+      btn.disabled = true; btn.innerText = 'રીસેટ થઈ રહ્યું છે...';
+      try {
+        const res = await licenseApi({ action: 'reset_password', dise: dise, rc: code.trim(), np: np.trim() });
+        if (res.status !== 'ok') { showLicenseMsg(licenseErrText(res), 'error'); return; }
+        document.getElementById('licResetForm').reset();
+        showLicenseTab('login');
+        document.getElementById('licDise').value = dise;
+        showLicenseMsg('✅ પાસવર્ડ રીસેટ થઈ ગયો. નવા પાસવર્ડથી લૉગિન કરો.', 'ok');
+      } finally {
+        btn.disabled = false; btn.innerText = 'પાસવર્ડ રીસેટ કરો';
+      }
+    }
+
+    async function handleChangePassword(e) {
+      e.preventDefault();
+      if (!licenseSession) { alert('કૃપા કરીને પહેલા લૉગિન કરો.'); return; }
+      const oldPw = document.getElementById('cpOld').value;
+      const newPw = document.getElementById('cpNew').value;
+      const newPw2 = document.getElementById('cpNew2').value;
+      if (newPw.trim().length < 6) { alert('નવો પાસવર્ડ ઓછામાં ઓછા ૬ અક્ષરનો હોવો જોઈએ.'); return; }
+      if (newPw !== newPw2) { alert('નવો પાસવર્ડ બંને વખત સરખો લખો.'); return; }
+      const btn = document.getElementById('cpBtn');
+      btn.disabled = true;
+      try {
+        const res = await licenseApi({ action: 'change_password', dise: licenseSession.dise, pw: oldPw.trim(), np: newPw.trim() });
+        if (res.status !== 'ok') { alert('❌ ' + licenseErrText(res)); return; }
+        licenseSession.pw = newPw.trim();
+        saveLicenseSession();
+        e.target.reset();
+        alert('✅ પાસવર્ડ સફળતાપૂર્વક બદલાઈ ગયો!');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function licenseLogout() {
+      if (!confirm('લૉગઆઉટ કરવું છે? (તમારો ડેટા આ ડિવાઇસમાં સુરક્ષિત રહેશે)')) return;
+      localStorage.setItem('lib_last_dise', licenseSession ? licenseSession.dise : '');
+      licenseSession = null;
+      localStorage.removeItem('lib_license_session');
+      lockApp();
+    }
+
+    async function initLicense() {
+      if (!licenseSession) { lockApp(); return; }
+      if (licenseSession.expiry && licenseSession.expiry < localToday()) {
+        lockApp(LICENSE_MESSAGES.EXPIRED);
+        return;
+      }
+      unlockApp();
+
+      // પાછળ શાંતિથી ફરી ચકાસણી (પાસવર્ડ બદલાયો હોય / લાઇસન્સ પૂરું થયું હોય / બ્લૉક થયું હોય તો લૉક)
+      const res = await licenseApi({ action: 'check', dise: licenseSession.dise, pw: licenseSession.pw || '' });
+      if (res.status === 'ok') {
+        licenseSession.school = res.school;
+        licenseSession.year = res.year;
+        licenseSession.expiry = res.expiry;
+        licenseSession.verified_at = Date.now();
+        saveLicenseSession();
+        applyLicense();
+      } else if (['NETWORK', 'NO_SERVER', 'SERVER_ERROR'].includes(res.code)) {
+        const ageDays = (Date.now() - (licenseSession.verified_at || 0)) / 86400000;
+        if (ageDays > OFFLINE_GRACE_DAYS) {
+          lockApp('ઘણા દિવસથી લાઇસન્સ ચકાસાયું નથી. ઇન્ટરનેટ ચાલુ કરી ફરી લૉગિન કરો.');
+        }
+      } else {
+        const msg = res.code === 'WRONG_PASSWORD' ? 'પાસવર્ડ બદલાયો છે. નવા પાસવર્ડથી લૉગિન કરો.' : licenseErrText(res);
+        localStorage.setItem('lib_last_dise', licenseSession.dise);
+        licenseSession = null;
+        localStorage.removeItem('lib_license_session');
+        lockApp(msg);
+      }
+    }
+
+
+    // --- LOCALSTORAGE PERSISTENT STORES ---
+    let students = JSON.parse(localStorage.getItem('lib_students') || '[]');
+    let books = JSON.parse(localStorage.getItem('lib_books') || '[]');
+    let transactions = JSON.parse(localStorage.getItem('lib_transactions') || '[]');
+
+    let schoolSettings = JSON.parse(localStorage.getItem('lib_school_settings') || JSON.stringify({
+      name: "શાળાનું નામ",
+      address: "તા. ____, જી. ____ (ગુજરાત)",
+      dise: "",
+      logo: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233730a3' stroke-width='2'%3E%3Cpath d='M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z'/%3E%3Cpath d='M6 6h10'/%3E%3Cpath d='M6 10h10'/%3E%3C/svg%3E"
+    }));
+
+    document.getElementById('issueDateInput').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dsDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('autoDate').value = new Date().toISOString().split('T')[0];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSettingsToUI();
+      if (window.lucide) { lucide.createIcons(); }
+      updateBadges();
+      populateDataLists();
+      populateYearOptions();
+      renderAllHeaders();
+      renderRegisterTable();
+      renderDeadstockTable();
+      renderActiveIssues();
+      generateReports();
+
+      // Open Issue Entry by default
+      switchTab('issue-entry');
+      updateBackupBanner();
+      initLicense();
+    });
+
+    // --- JSON BACKUP / RESTORE ---
+    function updateBackupBanner() {
+      const msg = document.getElementById('syncStatusMsg');
+      const time = document.getElementById('syncLastTime');
+      const dot = document.getElementById('backupDot');
+      if (!msg || !time || !dot) return;
+      const lastBackup = Number(localStorage.getItem('lib_last_backup') || 0);
+      const lastChange = Number(localStorage.getItem('lib_last_change') || 0);
+
+      time.innerText = lastBackup
+        ? `છેલ્લો બેકઅપ: ${new Date(lastBackup).toLocaleString('gu-IN')}`
+        : 'છેલ્લો બેકઅપ: હજી લીધો નથી';
+
+      if (lastChange > lastBackup) {
+        msg.innerText = 'છેલ્લા બેકઅપ પછી ફેરફાર થયો છે — JSON ડાઉનલોડ કરી બેકઅપ લો.';
+        dot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      } else {
+        msg.innerText = 'ડેટા આ ડિવાઇસમાં સેવ છે અને બેકઅપ અપ-ટુ-ડેટ છે.';
+        dot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500';
+      }
+    }
+
+    // દરેક ફેરફાર પછી બોલાવાય છે (ડેટા localStorage માં સેવ થઈ ચૂક્યો હોય છે)
+    function markDataChanged() {
+      localStorage.setItem('lib_last_change', String(Date.now()));
+      updateBackupBanner();
+    }
+
+    function downloadJsonBackup() {
+      const backup = {
+        app: 'SchoolLibraryRegister',
+        version: 1,
+        licensed_dise: licenseSession ? licenseSession.dise : '',
+        exported_at: new Date().toISOString(),
+        school_settings: schoolSettings,
+        students: students,
+        books: books,
+        transactions: transactions
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Library_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      localStorage.setItem('lib_last_backup', String(Date.now()));
+      updateBackupBanner();
+    }
+
+    function importJsonBackup(e) {
+      const input = e.target;
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          const okStructure = data && Array.isArray(data.students) && Array.isArray(data.books) && Array.isArray(data.transactions);
+          if (!okStructure) {
+            alert('❌ આ માન્ય બેકઅપ ફાઇલ નથી. કૃપા કરીને આ સોફ્ટવેરમાંથી ડાઉનલોડ કરેલી JSON ફાઇલ જ પસંદ કરો.');
+            return;
+          }
+
+          if (data.licensed_dise && licenseSession && String(data.licensed_dise) !== String(licenseSession.dise)) {
+            alert('❌ આ બેકઅપ ફાઇલ બીજી શાળા (DISE: ' + data.licensed_dise + ') ની છે. તમારા લાઇસન્સમાં તે અપલોડ થઈ શકશે નહીં.');
+            return;
+          }
+
+          const msg = `બેકઅપ ફાઇલમાં:\n• વિદ્યાર્થીઓ: ${data.students.length}\n• પુસ્તકો: ${data.books.length}\n• ઇસ્યુ નોંધ: ${data.transactions.length}\n\nહાલનો તમામ ડેટા આ ફાઇલના ડેટાથી બદલાઈ જશે. આગળ વધવું છે?`;
+          if (!confirm(msg)) return;
+
+          students = data.students;
+          books = data.books;
+          transactions = data.transactions;
+          if (data.school_settings && typeof data.school_settings === 'object') {
+            schoolSettings = Object.assign({}, schoolSettings, data.school_settings);
+            if (licenseSession) { schoolSettings.name = licenseSession.school; schoolSettings.dise = licenseSession.dise; }
+            localStorage.setItem('lib_school_settings', JSON.stringify(schoolSettings));
+          }
+
+          localStorage.setItem('lib_students', JSON.stringify(students));
+          localStorage.setItem('lib_books', JSON.stringify(books));
+          localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+          localStorage.setItem('lib_last_backup', String(Date.now()));
+          localStorage.setItem('lib_last_change', String(Date.now() - 1));
+
+          loadSettingsToUI();
+          updateBadges();
+          populateDataLists();
+          renderAllHeaders();
+          renderRegisterTable();
+          renderDeadstockTable();
+          renderActiveIssues();
+          generateReports();
+          updateBackupBanner();
+          if (window.lucide) { lucide.createIcons(); }
+
+          alert('✅ ડેટા સફળતાપૂર્વક પાછો આવી ગયો!');
+        } catch (err) {
+          alert('❌ ફાઇલ વાંચવામાં ભૂલ: ' + err.message);
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // --- RENDER OFFICIAL HEADER ACROSS ALL PRINTABLE TABS ---
+    function createHeaderNode(reportTitle, extraMeta = '') {
+      const template = document.getElementById('officialHeaderTemplate');
+      const clone = template.content.cloneNode(true);
+      
+      clone.querySelector('.school-name-text').innerText = schoolSettings.name;
+      clone.querySelector('.school-address-text').innerText = schoolSettings.address;
+      clone.querySelector('.school-dise-text').innerText = schoolSettings.dise;
+      clone.querySelector('.report-title-badge').innerText = reportTitle;
+      clone.querySelector('.school-logo-img').src = schoolSettings.logo;
+      clone.querySelector('.school-date-text').innerText = new Date().toLocaleDateString('gu-IN');
+      clone.querySelector('.school-year-text').innerText = (licenseSession && licenseSession.year) ? licenseSession.year : "";
+      if (extraMeta) {
+        clone.querySelector('.extra-meta-text').innerText = extraMeta;
+      }
+      return clone;
+    }
+
+    function renderAllHeaders() {
+      const regMount = document.getElementById('registerHeaderMount');
+      if (regMount) {
+        regMount.innerHTML = '';
+        regMount.appendChild(createHeaderNode('પુસ્તક ઇસ્યુ અને જમા રજીસ્ટર', `કુલ નોંધ: ${transactions.length}`));
+      }
+
+      const dsMount = document.getElementById('deadstockHeaderMount');
+      if (dsMount) {
+        dsMount.innerHTML = '';
+        dsMount.appendChild(createHeaderNode('શાળા ગ્રંથાલય પુસ્તક ડેડસ્ટોક રજીસ્ટર', `કુલ પુસ્તકો: ${books.length}`));
+      }
+
+      const repMount = document.getElementById('reportsHeaderMount');
+      if (repMount) {
+        repMount.innerHTML = '';
+        repMount.appendChild(createHeaderNode('ધોરણવાર અને માસવાર વાંચન વિશ્લેષણ અહેવાલ'));
+      }
+
+      const cardMount = document.getElementById('studentCardHeaderMount');
+      if (cardMount) {
+        cardMount.innerHTML = '';
+        cardMount.appendChild(createHeaderNode('વિદ્યાર્થી વાર્ષિક વાંચન પ્રોફાઇલ કાર્ડ'));
+      }
+    }
+
+    // --- TAB SWITCHING ---
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+
+      // Desktop Buttons Styling
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-400', 'text-indigo-950', 'shadow');
+        btn.classList.add('text-indigo-100', 'hover:bg-indigo-800');
+      });
+      const activeDesktopBtn = document.getElementById(`tab-${tabId}`);
+      if (activeDesktopBtn) {
+        activeDesktopBtn.classList.add('bg-amber-400', 'text-indigo-950', 'shadow');
+        activeDesktopBtn.classList.remove('text-indigo-100', 'hover:bg-indigo-800');
+      }
+
+      // Mobile Buttons Styling
+      document.querySelectorAll('.mob-tab').forEach(mBtn => {
+        mBtn.classList.remove('bg-amber-400', 'text-indigo-950', 'font-bold', 'shadow');
+        mBtn.classList.add('bg-indigo-900', 'text-indigo-100', 'font-medium', 'border', 'border-indigo-800/70');
+      });
+      const activeMobBtn = document.getElementById(`mob-tab-${tabId}`);
+      if (activeMobBtn) {
+        activeMobBtn.classList.add('bg-amber-400', 'text-indigo-950', 'font-bold', 'shadow');
+        activeMobBtn.classList.remove('bg-indigo-900', 'text-indigo-100', 'font-medium', 'border', 'border-indigo-800/70');
+      }
+
+      const targetContent = document.getElementById(`content-${tabId}`);
+      if (targetContent) {
+        targetContent.classList.remove('hidden');
+      }
+
+      if (tabId === 'register') { renderRegisterTable(); renderAllHeaders(); }
+      if (tabId === 'deadstock') { renderDeadstockTable(); renderAllHeaders(); }
+      if (tabId === 'issue-entry') { renderActiveIssues(); }
+      if (tabId === 'reports') { generateReports(); renderAllHeaders(); }
+      if (window.lucide) { lucide.createIcons(); }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function printSection(tabId) {
+      switchTab(tabId.replace('content-', ''));
+      setTimeout(() => {
+        window.print();
+      }, 200);
+    }
+
+    // --- DEADSTOCK REGISTRATION & MANAGEMENT ---
+    function handleDeadstockAdd(e) {
+      e.preventDefault();
+      const id = document.getElementById('dsBookId').value.trim();
+      const title = document.getElementById('dsBookTitle').value.trim();
+      const author = document.getElementById('dsBookAuthor').value.trim();
+      const source = document.getElementById('dsSource').value;
+      const date = document.getElementById('dsDate').value;
+      const price = document.getElementById('dsPrice').value;
+      const billNo = document.getElementById('dsBillNo').value.trim();
+
+      if (!id || !title) {
+        alert('કૃપા કરીને પુસ્તક ક્રમાંક અને પુસ્તકનું નામ દાખલ કરો.');
+        return;
+      }
+
+      const existIdx = books.findIndex(b => String(b.book_id).trim().toLowerCase() === id.toLowerCase());
+      const newBook = {
+        book_id: id,
+        title: title,
+        author: author,
+        source: source,
+        receipt_date: date,
+        price: price ? Number(price) : '',
+        bill_no: billNo,
+        status: 'ACTIVE',
+        write_off_date: '',
+        write_off_reason: '',
+        write_off_ref: ''
+      };
+
+      if (existIdx >= 0) {
+        newBook.status = books[existIdx].status || 'ACTIVE';
+        newBook.write_off_date = books[existIdx].write_off_date || '';
+        newBook.write_off_reason = books[existIdx].write_off_reason || '';
+        newBook.write_off_ref = books[existIdx].write_off_ref || '';
+        books[existIdx] = newBook;
+      } else {
+        books.push(newBook);
+      }
+
+      localStorage.setItem('lib_books', JSON.stringify(books));
+      updateBadges();
+      populateDataLists();
+      renderDeadstockTable();
+
+      document.getElementById('dsBookId').value = '';
+      document.getElementById('dsBookTitle').value = '';
+      document.getElementById('dsBookAuthor').value = '';
+      document.getElementById('dsPrice').value = '';
+      document.getElementById('dsBillNo').value = '';
+
+      alert(`પુસ્તક '${title}' (${id}) ડેડસ્ટોકમાં સફળતાપૂર્વક નોંધાઈ ગયું!`);
+      markDataChanged();
+    }
+
+    function openWriteOffModal(bookId) {
+      const b = books.find(item => String(item.book_id).trim() === String(bookId).trim());
+      if (!b) return;
+
+      document.getElementById('modalTargetBookId').value = b.book_id;
+      document.getElementById('modalBookTitle').innerText = b.title;
+      document.getElementById('modalBookId').innerText = b.book_id;
+      document.getElementById('modalWriteOffDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('modalWriteOffRef').value = '';
+      document.getElementById('writeOffModal').classList.remove('hidden');
+    }
+
+    function closeWriteOffModal() {
+      document.getElementById('writeOffModal').classList.add('hidden');
+    }
+
+    function confirmWriteOff(e) {
+      e.preventDefault();
+      const bookId = document.getElementById('modalTargetBookId').value;
+      const writeDate = document.getElementById('modalWriteOffDate').value;
+      const reason = document.getElementById('modalWriteOffReason').value;
+      const ref = document.getElementById('modalWriteOffRef').value.trim();
+
+      const bIndex = books.findIndex(item => String(item.book_id).trim() === String(bookId).trim());
+      if (bIndex !== -1) {
+        books[bIndex].status = 'DISCARDED';
+        books[bIndex].write_off_date = writeDate;
+        books[bIndex].write_off_reason = reason;
+        books[bIndex].write_off_ref = ref;
+
+        localStorage.setItem('lib_books', JSON.stringify(books));
+        updateBadges();
+        populateDataLists();
+        renderDeadstockTable();
+        closeWriteOffModal();
+
+        alert(`પુસ્તક '${books[bIndex].title}' સફળતાપૂર્વક કમી કરવામાં આવ્યું છે.\nહવે આ પુસ્તક વિદ્યાર્થીઓને ઇસ્યુ થઈ શકશે નહીં.`);
+        markDataChanged();
+      }
+    }
+
+    function reinstateBook(bookId) {
+      if (!confirm('શું તમે આ કમી કરેલા પુસ્તકને ફરીથી ચાલુ/ઉપલબ્ધ કરવા માંગો છો?')) return;
+      const bIndex = books.findIndex(item => String(item.book_id).trim() === String(bookId).trim());
+      if (bIndex !== -1) {
+        books[bIndex].status = 'ACTIVE';
+        books[bIndex].write_off_date = '';
+        books[bIndex].write_off_reason = '';
+        books[bIndex].write_off_ref = '';
+
+        localStorage.setItem('lib_books', JSON.stringify(books));
+        updateBadges();
+        populateDataLists();
+        renderDeadstockTable();
+        alert('પુસ્તક ફરીથી સક્રિય કરવામાં આવ્યું છે!');
+        markDataChanged();
+      }
+    }
+
+    function renderDeadstockTable() {
+      const srcFilter = document.getElementById('dsFilterSource').value;
+      const stFilter = document.getElementById('dsFilterStatus').value;
+      const searchVal = (document.getElementById('dsSearchInput').value || '').trim().toLowerCase();
+
+      const tbody = document.getElementById('deadstockTableBody');
+      tbody.innerHTML = '';
+
+      let totalCount = 0, purCount = 0, ssaCount = 0, smcCount = 0, discCount = 0;
+
+      books.forEach(b => {
+        totalCount++;
+        const s = b.source || '';
+        if (s.includes('ખરીદી')) purCount++;
+        else if (s.includes('SSA')) ssaCount++;
+        else if (s.includes('નગર') || s.includes('જિલ્લા') || s.includes('સમિતિ') || s.includes('દાતા')) smcCount++;
+
+        if (b.status === 'DISCARDED') discCount++;
+      });
+
+      document.getElementById('statDsTotal').innerText = totalCount;
+      document.getElementById('statDsPurchased').innerText = purCount;
+      document.getElementById('statDsSSA').innerText = ssaCount;
+      document.getElementById('statDsSMC').innerText = smcCount;
+      document.getElementById('statDsDiscarded').innerText = discCount;
+
+      let filtered = books.filter(b => {
+        if (srcFilter !== 'ALL' && !(b.source || '').includes(srcFilter)) return false;
+        if (stFilter === 'ACTIVE' && b.status === 'DISCARDED') return false;
+        if (stFilter === 'DISCARDED' && b.status !== 'DISCARDED') return false;
+
+        if (searchVal) {
+          const id = String(b.book_id || '').toLowerCase();
+          const title = String(b.title || '').toLowerCase();
+          const author = String(b.author || '').toLowerCase();
+          if (!id.includes(searchVal) && !title.includes(searchVal) && !author.includes(searchVal)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" class="p-6 text-center text-slate-400 font-semibold">ડેડસ્ટોકમાં કોઈ પુસ્તક મળેલ નથી.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach((b, index) => {
+        const isDiscarded = b.status === 'DISCARDED';
+        const tr = document.createElement('tr');
+        tr.className = isDiscarded ? 'bg-rose-50/50 hover:bg-rose-100/50' : (index % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/70 hover:bg-slate-50');
+
+        tr.innerHTML = `
+          <td class="p-1.5 text-center font-bold text-slate-500">${index + 1}</td>
+          <td class="p-1.5 text-center font-mono font-bold text-slate-900">${b.book_id}</td>
+          <td class="p-1.5 font-bold ${isDiscarded ? 'text-rose-950 line-through' : 'text-indigo-950'}">${b.title}</td>
+          <td class="p-1.5 text-slate-600">${b.author || '-'}</td>
+          <td class="p-1.5 text-center font-semibold">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${getSourceBadgeClass(b.source)}">
+              ${b.source || 'ખરીદી'}
+            </span>
+          </td>
+          <td class="p-1.5 text-center text-slate-700">${formatDate(b.receipt_date)}</td>
+          <td class="p-1.5 text-center font-bold text-slate-800">${b.price ? '₹' + b.price : '-'}</td>
+          <td class="p-1.5 text-center text-slate-600">${b.bill_no || '-'}</td>
+          <td class="p-1.5 text-center">
+            ${isDiscarded 
+              ? '<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full text-[10px]">કમી કરેલ</span>' 
+              : '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-[10px]">ચાલુ</span>'}
+          </td>
+          <td class="p-1.5 text-slate-600 text-[11px]">
+            ${isDiscarded 
+              ? `<span class="text-rose-700 font-semibold">${b.write_off_reason || 'કમી'}</span> <span class="text-slate-400 block text-[10px]">(${formatDate(b.write_off_date)} ${b.write_off_ref ? '| ' + b.write_off_ref : ''})</span>`
+              : '-'}
+          </td>
+          <td class="p-1.5 text-center no-print">
+            ${isDiscarded
+              ? `<button onclick="reinstateBook('${b.book_id}')" title="પુનઃ ચાલુ કરો" class="text-emerald-600 hover:text-emerald-800 font-bold text-[10px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">પુનઃ ચાલુ</button>`
+              : `<button onclick="openWriteOffModal('${b.book_id}')" title="પુસ્તક કમી કરો" class="text-rose-700 hover:text-rose-900 font-bold text-[10px] bg-rose-50 px-2 py-0.5 rounded border border-rose-300">કમી કરો</button>`}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function getSourceBadgeClass(src) {
+      if (!src) return 'bg-slate-100 text-slate-700';
+      if (src.includes('SSA')) return 'bg-sky-100 text-sky-800';
+      if (src.includes('નગર') || src.includes('જિલ્લા')) return 'bg-teal-100 text-teal-800';
+      if (src.includes('ખરીદી')) return 'bg-emerald-100 text-emerald-800';
+      if (src.includes('સમિતિ') || src.includes('દાતા')) return 'bg-amber-100 text-amber-800';
+      return 'bg-purple-100 text-purple-800';
+    }
+
+    // --- POPULATE DATALISTS (ONLY ACTIVE BOOKS AVAILABLE FOR ISSUE!) ---
+    function populateDataLists() {
+      onStandardChange();
+
+      const sAll = document.getElementById('studentsAllList');
+      sAll.innerHTML = '';
+      students.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = `${s.name} - G.R. ${s.gr_no} (ધોરણ ${s.std})`;
+        sAll.appendChild(opt);
+      });
+
+      const bList = document.getElementById('booksList');
+      bList.innerHTML = '';
+      books.forEach(b => {
+        if (b.status === 'DISCARDED') return;
+        const opt = document.createElement('option');
+        opt.value = `${b.title} [${b.book_id}]`;
+        bList.appendChild(opt);
+      });
+    }
+
+    function updateBadges() {
+      document.getElementById('badgeStudentCount').innerText = `${students.length} રેકોર્ડ`;
+      const activeBooksCount = books.filter(b => b.status !== 'DISCARDED').length;
+      document.getElementById('badgeBookCount').innerText = `${activeBooksCount} ચાલુ પુસ્તક`;
+      document.getElementById('statTotalStudents').innerText = students.length;
+      document.getElementById('statTotalBooks').innerText = activeBooksCount;
+    }
+
+    // --- ISSUE FUNCTION WITH STRICT CONFLICT & OVERLAP BLOCKING ---
+    function handleBookIssue(e) {
+      e.preventDefault();
+      const selectedStd = document.getElementById('issueStdSelect').value;
+      const sVal = document.getElementById('issueStudentInput').value.trim();
+      const bVal = document.getElementById('issueBookInput').value.trim();
+      const issueDate = document.getElementById('issueDateInput').value;
+      const pastReturnDate = document.getElementById('pastReturnDateInput').value;
+
+      if (!sVal || !bVal) {
+        alert('કૃપા કરીને વિદ્યાર્થી અને પુસ્તકની વિગત પસંદ કરો.');
+        return;
+      }
+
+      // ૧. પુસ્તક શોધો
+      const bookIdMatch = bVal.match(/\[(.*?)\]/) || bVal.match(/^([A-Za-z0-9-]+)\s*[-–]/);
+      const inputBookId = bookIdMatch ? (bookIdMatch[1] || bookIdMatch[0]).trim() : '';
+      const cleanBookTitle = bVal.replace(/\[.*?\]/g, '').replace(/^[A-Za-z0-9-]+\s*[-–]/, '').trim();
+
+      let matchedBook = books.find(b => {
+        const bId = String(b.book_id || '').trim().toLowerCase();
+        const bTitle = (b.title || '').trim().toLowerCase();
+        if (inputBookId && bId === inputBookId.toLowerCase()) return true;
+        if (cleanBookTitle && bTitle === cleanBookTitle.toLowerCase()) return true;
+        return false;
+      });
+
+      // નિયમ ૧: શું પુસ્તક ડેડસ્ટોકમાંથી કમી કરેલ છે?
+      if (matchedBook && matchedBook.status === 'DISCARDED') {
+        alert(`❌ ભૂલ: પુસ્તક '${matchedBook.title}' (${matchedBook.book_id}) ડેડસ્ટોકમાંથી કમી કરવામાં આવેલ છે!\n\nકારણ: ${matchedBook.write_off_reason || 'નષ્ટ/ફાટી ગયેલ'}\nતારીખ: ${formatDate(matchedBook.write_off_date)}\n\nઆ પુસ્તક વિદ્યાર્થીને ઇસ્યુ કરી શકાશે નહીં.`);
+        return;
+      }
+
+      const targetBookId = matchedBook ? String(matchedBook.book_id).trim().toLowerCase() : (inputBookId.toLowerCase() || cleanBookTitle.toLowerCase());
+
+      // Helper to turn any date to comparable YYYY-MM-DD
+      function toIsoDate(dStr) {
+        const c = getDateComponents(dStr);
+        if (!c) return null;
+        return `${String(c.year).padStart(4, '0')}-${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
+      }
+
+      const newStartIso = toIsoDate(issueDate) || '0000-00-00';
+      const newEndIso = pastReturnDate ? (toIsoDate(pastReturnDate) || '9999-12-31') : '9999-12-31';
+
+      // નિયમ ૨: શું આ પુસ્તક હાલમાં અન્ય વિદ્યાર્થી પાસે વાંચવા માટે આપેલ છે અથવા સમયગાળો અથડાય છે?
+      for (let i = 0; i < transactions.length; i++) {
+        const t = transactions[i];
+        const tBookId = String(t.book_id || '').trim().toLowerCase();
+        if (tBookId !== targetBookId) continue;
+
+        const isCurrentlyOut = (t.status === 'ISSUED' || !t.return_date || String(t.return_date).trim() === '' || String(t.return_date).trim() === '-');
+
+        if (isCurrentlyOut) {
+          alert(`⚠️ પુસ્તક ફાળવી શકાશે નહીં!\n\nઆ પુસ્તક '${t.book_title}' (${t.book_id}) હાલમાં વિદ્યાર્થી '${t.student_name}' (G.R.: ${t.gr_no}, ધોરણ: ${t.std}) પાસે ઇસ્યુ થયેલું છે અને વાંચન માટે આપેલ છે!\n\nઇસ્યુ તારીખ: ${formatDate(t.issue_date)}\n\nજ્યાં સુધી વિદ્યાર્થી આ પુસ્તક જમા ન કરાવે ત્યાં સુધી અન્ય કોઈ વિદ્યાર્થીને ફાળવી શકાશે નહીં.`);
+          return;
+        }
+
+        const existStartIso = toIsoDate(t.issue_date) || '0000-00-00';
+        const existEndIso = toIsoDate(t.return_date) || '9999-12-31';
+
+        if ((newStartIso <= existEndIso) && (newEndIso >= existStartIso)) {
+          alert(`⚠️ સમયગાળામાં અથડામણ (Conflict):\n\nઆ પુસ્તક '${t.book_title}' (${t.book_id}) તારીખ ${formatDate(t.issue_date)} થી ${formatDate(t.return_date)} દરમિયાન વિદ્યાર્થી '${t.student_name}' (G.R.: ${t.gr_no}) પાસે વાંચન માટે આપેલ હતું/છે!\n\nઆ સમયગાળામાં આ પુસ્તક અન્ય કોઈ વિદ્યાર્થીને ફાળવી શકાશે નહીં.`);
+          return;
+        }
+      }
+
+      // ૨. વિદ્યાર્થી શોધો
+      const grMatch = sVal.match(/\d+/);
+      const inputGr = grMatch ? grMatch[0].trim() : '';
+      const cleanStudentName = sVal.replace(/\(.*?\)/g, '').replace(/[-–].*$/g, '').trim();
+
+      let matchedStudent = students.find(s => {
+        const sGr = String(s.gr_no || '').trim();
+        const sName = (s.name || '').trim().toLowerCase();
+        if (inputGr && sGr === inputGr) return true;
+        if (cleanStudentName && sName === cleanStudentName.toLowerCase()) return true;
+        return false;
+      });
+
+      if (!matchedStudent) {
+        matchedStudent = {
+          gr_no: inputGr || String(Date.now()).slice(-4),
+          name: cleanStudentName || sVal,
+          std: selectedStd || '1',
+          roll_no: ''
+        };
+        students.push(matchedStudent);
+        localStorage.setItem('lib_students', JSON.stringify(students));
+      }
+
+      if (!matchedBook) {
+        matchedBook = {
+          book_id: inputBookId || ("B-" + (books.length + 101)),
+          title: cleanBookTitle || bVal,
+          author: '',
+          source: 'ખરીદી',
+          status: 'ACTIVE'
+        };
+        books.push(matchedBook);
+        localStorage.setItem('lib_books', JSON.stringify(books));
+      }
+
+      const isAlreadyReturned = !!pastReturnDate;
+
+      const newTxn = {
+        id: 'TXN_' + Date.now(),
+        gr_no: String(matchedStudent.gr_no).trim(),
+        student_name: matchedStudent.name,
+        std: selectedStd || matchedStudent.std,
+        book_id: String(matchedBook.book_id).trim(),
+        book_title: matchedBook.title,
+        book_author: matchedBook.author || '',
+        issue_date: issueDate,
+        return_date: isAlreadyReturned ? pastReturnDate : null,
+        status: isAlreadyReturned ? 'RETURNED' : 'ISSUED'
+      };
+
+      transactions.unshift(newTxn);
+      localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+
+      document.getElementById('issueStudentInput').value = '';
+      document.getElementById('issueBookInput').value = '';
+      document.getElementById('pastReturnDateInput').value = '';
+
+      alert(`પુસ્તક '${matchedBook.title}' વિદ્યાર્થી '${matchedStudent.name}' (G.R.: ${matchedStudent.gr_no}) ને સફળતાપૂર્વક ઇસ્યુ થયું!`);
+      renderRegisterTable();
+      renderActiveIssues();
+      generateReports();
+      populateDataLists();
+      markDataChanged();
+    }
+
+    // ★ માસિક ઓટો ફાળવણી: દરેક વિદ્યાર્થીને ૧ નવું (ક્યારેય ન વાંચેલું) પુસ્તક
+    function autoAllotMonthly() {
+      const stdSel = document.getElementById('autoStdSelect').value;
+      const dateVal = document.getElementById('autoDate').value || new Date().toISOString().split('T')[0];
+      const autoReturn = document.getElementById('autoReturnOld').checked;
+
+      const toIso = (d) => {
+        const c = getDateComponents(d);
+        return c ? `${String(c.year).padStart(4,'0')}-${String(c.month).padStart(2,'0')}-${String(c.day).padStart(2,'0')}` : null;
+      };
+      const newIso = toIso(dateVal);
+      const newComp = getDateComponents(dateVal);
+      const norm = (x) => String(x || '').trim().toLowerCase();
+
+      // લક્ષ્ય વિદ્યાર્થીઓ
+      const targets = students.filter(s => stdSel === 'ALL' || cleanStdNumber(s.std) === stdSel);
+      if (targets.length === 0) { alert('આ ધોરણમાં કોઈ વિદ્યાર્થી નથી.'); return; }
+
+      // આ જ માસમાં જેને પુસ્તક મળી ચૂક્યું હોય તેને છોડી દો (બે વાર ક્લિક થાય તો ડુપ્લિકેટ ન થાય)
+      const alreadyThisMonth = new Set(
+        transactions.filter(t => {
+          const c = getDateComponents(t.issue_date);
+          return c && c.year === newComp.year && c.month === newComp.month;
+        }).map(t => norm(t.gr_no))
+      );
+      const pendingStudents = targets.filter(s => !alreadyThisMonth.has(norm(s.gr_no)));
+      if (pendingStudents.length === 0) { alert('આ માસમાં તમામ વિદ્યાર્થીઓને પુસ્તક ફાળવાઈ ચૂક્યું છે.'); return; }
+
+      if (!confirm(`${pendingStudents.length} વિદ્યાર્થીઓને ${formatDate(dateVal)} ની તારીખે ૧-૧ પુસ્તક ફાળવવું છે?`)) return;
+
+      // પહેલાના બાકી પુસ્તકો જમા
+      if (autoReturn) {
+        const targetGrs = new Set(pendingStudents.map(s => norm(s.gr_no)));
+        transactions.forEach(t => {
+          if (t.status === 'ISSUED' && targetGrs.has(norm(t.gr_no))) {
+            t.return_date = dateVal;
+            t.status = 'RETURNED';
+          }
+        });
+      }
+
+      // ચાલુ પુસ્તકો (કમી કરેલા બાકાત)
+      const activeBooks = books.filter(b => b.status !== 'DISCARDED');
+
+      // કયું પુસ્તક અત્યારે/આ તારીખે ખાલી છે?
+      const isBookFree = (bookId) => {
+        return !transactions.some(t => {
+          if (norm(t.book_id) !== norm(bookId)) return false;
+          const open = (t.status === 'ISSUED' || !t.return_date || String(t.return_date).trim() === '' || String(t.return_date).trim() === '-');
+          if (open) return true;
+          const endIso = toIso(t.return_date);
+          return endIso && endIso > newIso;
+        });
+      };
+
+      // દરેક વિદ્યાર્થીએ પહેલાં વાંચેલા પુસ્તકો
+      const readMap = {};
+      transactions.forEach(t => {
+        const g = norm(t.gr_no);
+        (readMap[g] = readMap[g] || new Set()).add(norm(t.book_id));
+      });
+
+      // રેન્ડમ ક્રમ
+      const pool = activeBooks.slice().sort(() => Math.random() - 0.5);
+      const usedNow = new Set();
+      const newTxns = [];
+      const noBook = [];
+
+      pendingStudents.forEach((s, i) => {
+        const g = norm(s.gr_no);
+        const read = readMap[g] || new Set();
+        const pick = pool.find(b =>
+          !usedNow.has(norm(b.book_id)) &&
+          !read.has(norm(b.book_id)) &&
+          isBookFree(b.book_id)
+        );
+        if (!pick) { noBook.push(s.name); return; }
+
+        usedNow.add(norm(pick.book_id));
+        newTxns.push({
+          id: 'TXN_' + Date.now() + '_' + i,
+          gr_no: String(s.gr_no).trim(),
+          student_name: s.name,
+          std: cleanStdNumber(s.std) || s.std,
+          book_id: String(pick.book_id).trim(),
+          book_title: pick.title,
+          book_author: pick.author || '',
+          issue_date: dateVal,
+          return_date: null,
+          status: 'ISSUED'
+        });
+      });
+
+      transactions = newTxns.concat(transactions);
+      localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+
+      renderRegisterTable();
+      renderActiveIssues();
+      generateReports();
+      populateDataLists();
+      markDataChanged();
+
+      let msg = `✅ ${newTxns.length} વિદ્યાર્થીઓને પુસ્તક ફાળવાયું.`;
+      if (noBook.length > 0) {
+        msg += `\n\n⚠️ આ ${noBook.length} વિદ્યાર્થીઓ માટે નવું (ન વાંચેલું) પુસ્તક ઉપલબ્ધ નથી:\n` + noBook.join(', ');
+      }
+      alert(msg);
+    }
+
+    function returnBook(txnId) {
+      const returnDate = prompt("જમા લીધાની તારીખ (DD/MM/YYYY અથવા YYYY-MM-DD):", new Date().toLocaleDateString("en-GB"));
+      if (!returnDate) return;
+
+      const txnIndex = transactions.findIndex(t => t.id === txnId);
+      if (txnIndex !== -1) {
+        transactions[txnIndex].return_date = returnDate;
+        transactions[txnIndex].status = 'RETURNED';
+        localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+        renderRegisterTable();
+        renderActiveIssues();
+        generateReports();
+        alert('પુસ્તક જમા લેવાઈ ગયું છે!');
+        markDataChanged();
+      }
+    }
+
+    function deleteTransaction(txnId) {
+      if (!confirm('શું તમે આ રજીસ્ટર નોંધ કાઢી નાખવા માંગો છો?')) return;
+      transactions = transactions.filter(t => t.id !== txnId);
+      localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+      renderRegisterTable();
+      renderActiveIssues();
+      generateReports();
+      markDataChanged();
+    }
+
+    // --- RENDER ISSUE REGISTER TABLE ---
+    function renderRegisterTable() {
+      const stdVal = document.getElementById('regStdFilter').value;
+      const statusVal = document.getElementById('regStatusFilter').value;
+      const monthVal = document.getElementById('regMonthFilter').value;
+      const searchVal = (document.getElementById('regSearchInput').value || '').toLowerCase().trim();
+
+      const tbody = document.getElementById('registerTableBody');
+      tbody.innerHTML = '';
+
+      let filtered = transactions.filter(t => {
+        if (stdVal !== 'ALL' && cleanStdNumber(t.std) !== stdVal) return false;
+        if (statusVal !== 'ALL' && t.status !== statusVal) return false;
+        if (monthVal !== 'ALL') {
+          const c = getDateComponents(t.issue_date);
+          if (!c || String(c.month).padStart(2, '0') !== monthVal) return false;
+        }
+        if (searchVal) {
+          const sName = (t.student_name || '').toLowerCase();
+          const bTitle = (t.book_title || '').toLowerCase();
+          const gr = String(t.gr_no || '').toLowerCase();
+          const bId = String(t.book_id || '').toLowerCase();
+
+          if (!sName.includes(searchVal) && !bTitle.includes(searchVal) && !gr.includes(searchVal) && !bId.includes(searchVal)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      renderAllHeaders();
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="13" class="p-6 text-center text-slate-400 font-semibold">કોઈ રજીસ્ટર નોંધ મળેલ નથી.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach((item, index) => {
+        const studentInfo = students.find(s => String(s.gr_no) === String(item.gr_no));
+        const rollNo = studentInfo?.roll_no || '-';
+        const isReturned = item.status === 'RETURNED';
+
+        const tr = document.createElement('tr');
+        tr.className = index % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/70 hover:bg-slate-50';
+
+        tr.innerHTML = `
+          <td class="p-1.5 text-center font-bold text-slate-500">${index + 1}</td>
+          <td class="p-1.5 text-center font-bold text-slate-700">${item.gr_no}</td>
+          <td class="p-1.5 font-bold text-indigo-950">${item.student_name}</td>
+          <td class="p-1.5 text-center font-semibold">ધો.${item.std}</td>
+          <td class="p-1.5 text-center text-slate-600">${rollNo}</td>
+          <td class="p-1.5 text-center font-mono font-bold text-slate-800">${item.book_id}</td>
+          <td class="p-1.5 font-semibold text-slate-900">${item.book_title}</td>
+          <td class="p-1.5 text-slate-600">${item.book_author || '-'}</td>
+          <td class="p-1.5 text-center font-medium text-slate-700">${formatDate(item.issue_date)}</td>
+          <td class="p-1.5 text-center font-medium ${isReturned ? 'text-emerald-700 font-bold' : 'text-amber-600'}">
+            ${item.return_date ? formatDate(item.return_date) : 'બાકી'}
+          </td>
+          <td class="p-1.5 text-center text-slate-400 italic font-mono text-[10px]">સહી</td>
+          <td class="p-1.5 text-center text-slate-400 italic font-mono text-[10px]">સહી</td>
+          <td class="p-1.5 text-center no-print">
+            <div class="flex items-center justify-center gap-1">
+              ${!isReturned ? `<button onclick="returnBook('${item.id}')" title="જમા લો" class="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">જમા</button>` : ''}
+              <button onclick="deleteTransaction('${item.id}')" title="ડિલીટ" class="text-rose-500 hover:text-rose-700 p-0.5">
+                <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function renderActiveIssues() {
+      const activeTable = document.getElementById('activeIssuesTable');
+      if (!activeTable) return;
+      activeTable.innerHTML = '';
+
+      const activeIssues = transactions.filter(t => t.status === 'ISSUED');
+      document.getElementById('activeCountBadge').innerText = `${activeIssues.length} બાકી`;
+
+      if (activeIssues.length === 0) {
+        activeTable.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-400 font-semibold">કોઈ સક્રિય ઇસ્યુ પુસ્તક પરત લેવાનું બાકી નથી.</td></tr>`;
+        return;
+      }
+
+      activeIssues.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b';
+        tr.innerHTML = `
+          <td class="p-2.5 font-bold text-slate-700">${item.gr_no}</td>
+          <td class="p-2.5 font-bold text-indigo-950">${item.student_name}</td>
+          <td class="p-2.5"><span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded font-bold">ધોરણ ${item.std}</span></td>
+          <td class="p-2.5 font-mono text-slate-700">${item.book_id}</td>
+          <td class="p-2.5 font-semibold text-slate-800">${item.book_title}</td>
+          <td class="p-2.5 text-slate-600">${formatDate(item.issue_date)}</td>
+          <td class="p-2.5 text-center">
+            <button onclick="returnBook('${item.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold shadow">
+              જમા લો
+            </button>
+          </td>
+        `;
+        activeTable.appendChild(tr);
+      });
+    }
+
+    // સ્માર્ટ ડેટ પાર્સર: કોઈપણ ફોર્મેટમાંથી { day, month, year } ચોક્કસ અલગ તારવે છે
+    function getDateComponents(dStr) {
+      if (!dStr) return null;
+      const s = String(dStr).trim();
+      if (s === '-' || s.toLowerCase() === 'null' || s === '' || s.toLowerCase() === 'undefined' || s === 'Invalid Date') return null;
+
+      // ૧. અગાઉ બગડેલી તારીખ: e.g. "09T18:30:00.000Z/07/2026"
+      const mCorrupt = s.match(/^(\d{1,2})T(.*?)\/(\d{1,2})\/(\d{4})/);
+      if (mCorrupt) {
+        return { day: parseInt(mCorrupt[1]), month: parseInt(mCorrupt[3]), year: parseInt(mCorrupt[4]) };
+      }
+
+      // ૨. ISO ફોર્મેટ T સાથે: e.g. "2026-07-09T18:30:00.000Z"
+      const mIsoT = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})T/);
+      if (mIsoT) {
+        return { year: parseInt(mIsoT[1]), month: parseInt(mIsoT[2]), day: parseInt(mIsoT[3]) };
+      }
+
+      // ૩. YYYY-MM-DD ફોર્મેટ
+      const mYmd = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+      if (mYmd) {
+        return { year: parseInt(mYmd[1]), month: parseInt(mYmd[2]), day: parseInt(mYmd[3]) };
+      }
+
+      // ૪. DD/MM/YYYY અથવા DD-MM-YYYY ફોર્મેટ
+      const mDmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (mDmy) {
+        return { day: parseInt(mDmy[1]), month: parseInt(mDmy[2]), year: parseInt(mDmy[3]) };
+      }
+
+      return null;
+    }
+
+    // ધોરણમાંથી માત્ર અંક અલગ તારવો (દા.ત. "ધો.6", "ધોરણ 6" => "6")
+    function cleanStdNumber(stdStr) {
+      if (!stdStr) return '';
+      const m = String(stdStr).match(/\d+/);
+      return m ? m[0] : String(stdStr).trim();
+    }
+
+    function formatDate(dStr) {
+      if (!dStr) return '-';
+      const str = String(dStr).trim();
+      if (str === '-' || str.toLowerCase() === 'null' || str === '' || str.toLowerCase() === 'undefined' || str === 'Invalid Date') return '-';
+
+      // ૧. અગાઉ બગડેલી તારીખ ક્લીન કરો: e.g. "09T18:30:00.000Z/07/2026"
+      const corruptMatch = str.match(/^(\d{1,2})T.*?\/(\d{1,2})\/(\d{4})/);
+      if (corruptMatch) {
+        return `${corruptMatch[1].padStart(2, '0')}/${corruptMatch[2].padStart(2, '0')}/${corruptMatch[3]}`;
+      }
+
+      // ૨. જો ISO ફોર્મેટ હોય: e.g. "2026-07-09T18:30:00.000Z" અથવા "2026-10-12"
+      const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (isoMatch) {
+        const y = isoMatch[1];
+        const m = isoMatch[2].padStart(2, '0');
+        const d = isoMatch[3].padStart(2, '0');
+        return `${d}/${m}/${y}`;
+      }
+
+      // ૩. જો પહેલેથી DD/MM/YYYY અથવા DD-MM-YYYY ફોર્મેટ હોય
+      const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (dmyMatch) {
+        return `${dmyMatch[1].padStart(2, '0')}/${dmyMatch[2].padStart(2, '0')}/${dmyMatch[3]}`;
+      }
+
+      // ૪. Fallback: Parse via Date
+      try {
+        const dt = new Date(str);
+        if (!isNaN(dt.getTime())) {
+          const d = String(dt.getDate()).padStart(2, '0');
+          const m = String(dt.getMonth() + 1).padStart(2, '0');
+          const y = dt.getFullYear();
+          return `${d}/${m}/${y}`;
+        }
+      } catch (e) {}
+
+      return str;
+    }
+
+    function loadStudentCard() {
+      const rawInput = (document.getElementById('studentCardSearchInput').value || '').trim();
+      if (!rawInput) {
+        alert('કૃપા કરીને વિદ્યાર્થીનું નામ અથવા G.R. નંબર લખો.');
+        return;
+      }
+
+      const grMatch = rawInput.match(/\d+/);
+      const searchGr = grMatch ? grMatch[0].trim() : '';
+
+      const cleanName = rawInput
+        .replace(/\(.*?\)/g, '')
+        .replace(/[-–].*$/g, '')
+        .trim()
+        .toLowerCase();
+
+      let student = students.find(s => {
+        const sGr = String(s.gr_no || '').trim();
+        const sName = (s.name || '').trim().toLowerCase();
+        if (searchGr && sGr === searchGr) return true;
+        if (cleanName && (sName.includes(cleanName) || cleanName.includes(sName))) return true;
+        return false;
+      });
+
+      if (!student) {
+        const txnMatch = transactions.find(t => {
+          const tGr = String(t.gr_no || '').trim();
+          const tName = (t.student_name || '').trim().toLowerCase();
+          if (searchGr && tGr === searchGr) return true;
+          if (cleanName && (tName.includes(cleanName) || cleanName.includes(tName))) return true;
+          return false;
+        });
+
+        if (txnMatch) {
+          student = {
+            gr_no: txnMatch.gr_no,
+            name: txnMatch.student_name,
+            std: txnMatch.std || '-',
+            roll_no: '-'
+          };
+        } else {
+          student = {
+            gr_no: searchGr || '-',
+            name: cleanName ? (rawInput.replace(/[-–(].*$/g, '').trim() || rawInput) : rawInput,
+            std: '-',
+            roll_no: '-'
+          };
+        }
+      }
+
+      renderAllHeaders();
+
+      document.getElementById('studentCardContainer').classList.remove('hidden');
+      document.getElementById('cardStudentName').innerText = student.name;
+      document.getElementById('cardStudentGr').innerText = student.gr_no;
+      document.getElementById('cardStudentStd').innerText = student.std;
+      document.getElementById('cardStudentRoll').innerText = student.roll_no || '-';
+
+      const targetGr = String(student.gr_no || '').trim();
+      const targetName = (student.name || '').trim().toLowerCase();
+
+      const studentTxns = transactions.filter(t => {
+        const tGr = String(t.gr_no || '').trim();
+        const tName = (t.student_name || '').trim().toLowerCase();
+
+        if (targetGr !== '-' && targetGr !== '' && tGr === targetGr) return true;
+        if (targetName && (tName === targetName || tName.includes(targetName) || targetName.includes(tName))) return true;
+
+        return false;
+      });
+
+      document.getElementById('cardStudentTotalBooks').innerText = studentTxns.length;
+
+      const historyBody = document.getElementById('cardBookHistoryBody');
+      historyBody.innerHTML = '';
+
+      if (studentTxns.length === 0) {
+        historyBody.innerHTML = `
+          <tr class="bg-slate-50/50">
+            <td class="p-2.5 text-center font-bold text-slate-500">૧</td>
+            <td class="p-2.5 text-center font-bold text-slate-400">નીલ</td>
+            <td class="p-2.5 font-bold text-slate-600 text-center">નીલ (કોઈ પુસ્તક વાંચેલ નથી)</td>
+            <td class="p-2.5 text-center text-slate-400 font-bold">નીલ</td>
+            <td class="p-2.5 text-center text-slate-400 font-bold">નીલ</td>
+            <td class="p-2.5 text-center text-slate-400 font-bold">નીલ</td>
+            <td class="p-2.5 text-center">
+              <span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600">
+                નીલ (NIL)
+              </span>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      studentTxns.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b';
+        const isPending = item.status === 'ISSUED';
+        tr.innerHTML = `
+          <td class="p-2 text-center font-bold text-slate-500">${index + 1}</td>
+          <td class="p-2 font-mono text-center font-bold text-slate-700">${item.book_id}</td>
+          <td class="p-2 font-bold text-slate-800">${item.book_title}</td>
+          <td class="p-2 text-slate-600">${item.book_author || '-'}</td>
+          <td class="p-2 text-center text-slate-700">${formatDate(item.issue_date)}</td>
+          <td class="p-2 text-center text-slate-700">${formatDate(item.return_date)}</td>
+          <td class="p-2 text-center">
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isPending ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+              ${isPending ? 'ઇસ્યુ (બાકી)' : 'વાંચીને જમા'}
+            </span>
+          </td>
+        `;
+        historyBody.appendChild(tr);
+      });
+    }
+
+    // --- MANUAL ENTRY FUNCTIONS ---
+    function handleManualStudentAdd(e) {
+      e.preventDefault();
+      const gr = document.getElementById('manualStudentGr').value.trim();
+      const name = document.getElementById('manualStudentName').value.trim();
+      const std = document.getElementById('manualStudentStd').value;
+      const roll = document.getElementById('manualStudentRoll').value.trim();
+
+      if (!gr || !name) {
+        alert('G.R. નંબર અને નામ લખવું ફરજિયાત છે.');
+        return;
+      }
+
+      const existIdx = students.findIndex(s => String(s.gr_no) === String(gr));
+      const newRec = { gr_no: gr, name: name, std: std, roll_no: roll };
+
+      if (existIdx >= 0) students[existIdx] = newRec;
+      else students.push(newRec);
+
+      localStorage.setItem('lib_students', JSON.stringify(students));
+      updateBadges();
+      populateDataLists();
+
+      document.getElementById('manualStudentGr').value = '';
+      document.getElementById('manualStudentName').value = '';
+      document.getElementById('manualStudentRoll').value = '';
+      alert(`વિદ્યાર્થી '${name}' (G.R. ${gr}) સાચવવામાં આવ્યો!`);
+      markDataChanged();
+    }
+
+    function handleManualBookAdd(e) {
+      e.preventDefault();
+      const id = document.getElementById('manualBookId').value.trim();
+      const title = document.getElementById('manualBookTitle').value.trim();
+      const author = document.getElementById('manualBookAuthor').value.trim();
+      const source = document.getElementById('manualBookSource').value;
+
+      if (!id || !title) {
+        alert('પુસ્તક ક્રમાંક અને પુસ્તકનું નામ લખવું ફરજિયાત છે.');
+        return;
+      }
+
+      const existIdx = books.findIndex(b => String(b.book_id).toLowerCase() === String(id).toLowerCase());
+      const newRec = {
+        book_id: id,
+        title: title,
+        author: author,
+        source: source,
+        receipt_date: new Date().toISOString().split('T')[0],
+        price: '',
+        bill_no: '',
+        status: 'ACTIVE'
+      };
+
+      if (existIdx >= 0) books[existIdx] = Object.assign(books[existIdx], newRec);
+      else books.push(newRec);
+
+      localStorage.setItem('lib_books', JSON.stringify(books));
+      updateBadges();
+      populateDataLists();
+      renderDeadstockTable();
+
+      document.getElementById('manualBookId').value = '';
+      document.getElementById('manualBookTitle').value = '';
+      document.getElementById('manualBookAuthor').value = '';
+      alert(`પુસ્તક '${title}' ડેડસ્ટોકમાં સાચવવામાં આવ્યું!`);
+      markDataChanged();
+    }
+
+    // --- CAMERA & GUJARATI OCR ---
+    let originalImageObj = null;
+    let imageRotationDegree = 0;
+
+    function handleBookPhotoSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const img = new Image();
+        img.onload = function() {
+          originalImageObj = img;
+          imageRotationDegree = 0;
+          processAndRenderCanvas();
+
+          document.getElementById('photoPlaceholder').classList.add('hidden');
+          document.getElementById('filterControls').classList.remove('hidden');
+          document.getElementById('btnRunOCR').disabled = false;
+          
+          const nextId = "B-" + (books.length + 101);
+          document.getElementById('cameraBookId').value = nextId;
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function rotateImage() {
+      imageRotationDegree = (imageRotationDegree + 90) % 360;
+      processAndRenderCanvas();
+    }
+
+    function reapplyFilter() {
+      processAndRenderCanvas();
+    }
+
+    function processAndRenderCanvas() {
+      if (!originalImageObj) return;
+
+      const canvas = document.getElementById('ocrCanvas');
+      const ctx = canvas.getContext('2d');
+      const applyEnhancement = document.getElementById('chkEnhanceGujarati').checked;
+
+      const angle = (imageRotationDegree * Math.PI) / 180;
+      const isRotated90 = (imageRotationDegree === 90 || imageRotationDegree === 270);
+
+      let maxDim = 1200;
+      let scale = Math.min(1, maxDim / Math.max(originalImageObj.width, originalImageObj.height));
+
+      const w = originalImageObj.width * scale;
+      const h = originalImageObj.height * scale;
+
+      canvas.width = isRotated90 ? h : w;
+      canvas.height = isRotated90 ? w : h;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(angle);
+      ctx.drawImage(originalImageObj, -w / 2, -h / 2, w, h);
+      ctx.restore();
+
+      if (applyEnhancement) {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imgData.data;
+
+        for (let i = 0; i < d.length; i += 4) {
+          let gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+          if (gray > 140) gray = 255;
+          else gray = gray * 0.7;
+          d[i] = gray; d[i+1] = gray; d[i+2] = gray;
+        }
+        ctx.putImageData(imgData, 0, 0);
+      }
+
+      canvas.classList.remove('hidden');
+      document.getElementById('bookPhotoPreview').classList.add('hidden');
+    }
+
+    async function runGujaratiOCRScan() {
+      const canvas = document.getElementById('ocrCanvas');
+      if (!canvas) return;
+
+      const statusBox = document.getElementById('ocrStatusBox');
+      const statusText = document.getElementById('ocrStatusText');
+      const progressBar = document.getElementById('ocrProgressBar');
+      const progressPercent = document.getElementById('ocrProgressPercent');
+
+      statusBox.classList.remove('hidden');
+      statusText.innerText = "ગુજરાતી OCR મોડલ લોડ થઈ રહ્યું છે...";
+      progressBar.style.width = '10%';
+      progressPercent.innerText = '10%';
+
+      try {
+        const worker = await Tesseract.createWorker(['guj', 'eng'], 1, {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              const p = Math.round(m.progress * 100);
+              progressBar.style.width = `${p}%`;
+              progressPercent.innerText = `${p}%`;
+              statusText.innerText = `ગુજરાતી અક્ષરો ઓળખાઈ રહ્યા છે (${p}%)...`;
+            }
+          }
+        });
+
+        const ret = await worker.recognize(canvas);
+        await worker.terminate();
+
+        progressBar.style.width = '100%';
+        progressPercent.innerText = '100%';
+        statusText.innerText = "સ્કેન સફળ! નીચે પુસ્તકનું નામ ચકાસો.";
+
+        const rawText = ret.data.text || '';
+        const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length >= 2);
+
+        if (lines.length > 0) {
+          document.getElementById('cameraBookTitle').value = lines.slice(0, 2).join(' ');
+          if (lines.length > 2) document.getElementById('cameraBookAuthor').value = lines[2];
+        } else {
+          statusText.innerText = "લખાણ સ્પષ્ટ મળ્યું નથી. તમે ટાઈપ કરી શકો છો.";
+        }
+      } catch (err) {
+        statusText.innerText = "સ્કેન કરવામાં વિલંબ થયો. તમે મેન્યુઅલ નામ લખી શકો છો.";
+      }
+    }
+
+    function saveCameraBookToRegister() {
+      const id = document.getElementById('cameraBookId').value.trim();
+      const title = document.getElementById('cameraBookTitle').value.trim();
+      const author = document.getElementById('cameraBookAuthor').value.trim();
+      const source = document.getElementById('cameraBookSource').value;
+
+      if (!id || !title) {
+        alert('કૃપા કરીને પુસ્તક ક્રમાંક અને નામ લખો.');
+        return;
+      }
+
+      const existIdx = books.findIndex(b => String(b.book_id).toLowerCase() === String(id).toLowerCase());
+      const newRec = {
+        book_id: id,
+        title: title,
+        author: author,
+        source: source,
+        receipt_date: new Date().toISOString().split('T')[0],
+        price: '',
+        bill_no: '',
+        status: 'ACTIVE'
+      };
+
+      if (existIdx >= 0) books[existIdx] = Object.assign(books[existIdx], newRec);
+      else books.push(newRec);
+
+      localStorage.setItem('lib_books', JSON.stringify(books));
+      updateBadges();
+      populateDataLists();
+      renderDeadstockTable();
+
+      document.getElementById('cameraBookId').value = '';
+      document.getElementById('cameraBookTitle').value = '';
+      document.getElementById('cameraBookAuthor').value = '';
+      alert(`ગુજરાતી પુસ્તક '${title}' ડેડસ્ટોકમાં નોંધાઈ ગયું!`);
+      markDataChanged();
+      switchTab('deadstock');
+    }
+
+    function onStandardChange() {
+      const selectedStd = document.getElementById('issueStdSelect').value;
+      const filteredDatalist = document.getElementById('studentsFilteredList');
+      filteredDatalist.innerHTML = '';
+      document.getElementById('issueStudentInput').value = '';
+
+      const filteredStudents = selectedStd 
+        ? students.filter(s => String(s.std).trim() === String(selectedStd).trim())
+        : students;
+
+      filteredStudents.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = `${s.name} (G.R.: ${s.gr_no}, ધોરણ: ${s.std})`;
+        filteredDatalist.appendChild(opt);
+      });
+    }
+
+    function populateYearOptions() {
+      const currentYear = new Date().getFullYear();
+      const select = document.getElementById('reportYearFilter');
+      select.innerHTML = '';
+      for (let y = currentYear; y >= currentYear - 3; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = `સત્ર ${y}-${(y+1).toString().slice(-2)}`;
+        select.appendChild(opt);
+      }
+    }
+
+    function generateReports() {
+      const selectedYear = parseInt(document.getElementById('reportYearFilter').value) || new Date().getFullYear();
+
+      // શૈક્ષણિક સત્રના ૧૨ માસ: જૂન (૬) થી મે (૫)
+      const academicMonths = [
+        { name: 'જૂન', m: 6, yr: selectedYear },
+        { name: 'જુલાઈ', m: 7, yr: selectedYear },
+        { name: 'ઓગસ્ટ', m: 8, yr: selectedYear },
+        { name: 'સપ્ટેમ્બર', m: 9, yr: selectedYear },
+        { name: 'ઓક્ટોબર', m: 10, yr: selectedYear },
+        { name: 'નવેમ્બર', m: 11, yr: selectedYear },
+        { name: 'ડિસેમ્બર', m: 12, yr: selectedYear },
+        { name: 'જાન્યુઆરી', m: 1, yr: selectedYear + 1 },
+        { name: 'ફેબ્રુઆરી', m: 2, yr: selectedYear + 1 },
+        { name: 'માર્ચ', m: 3, yr: selectedYear + 1 },
+        { name: 'એપ્રિલ', m: 4, yr: selectedYear + 1 },
+        { name: 'મે', m: 5, yr: selectedYear + 1 }
+      ];
+
+      document.getElementById('statTotalRead').innerText = transactions.length;
+      document.getElementById('statActiveReaders').innerText = new Set(transactions.map(t => String(t.gr_no).trim())).size;
+
+      // ધોરણ ૧ થી ૮ નું નિશ્ચિત લિસ્ટ
+      const standards = ['1', '2', '3', '4', '5', '6', '7', '8'];
+
+      const head = document.getElementById('matrixHead');
+      head.innerHTML = `
+        <tr>
+          <th class="p-2 border text-left">ધોરણ</th>
+          ${academicMonths.map(m => `<th class="p-2 border">${m.name}</th>`).join('')}
+          <th class="p-2 border bg-amber-400 text-indigo-950 font-black">કુલ</th>
+        </tr>
+      `;
+
+      const body = document.getElementById('matrixBody');
+      body.innerHTML = '';
+
+      let monthTotals = new Array(12).fill(0);
+      let grandTotal = 0;
+
+      standards.forEach(std => {
+        let rowTotal = 0;
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 border-b';
+
+        let cellsHtml = `<td class="p-2 border font-bold text-left bg-slate-50">ધોરણ - ${std}</td>`;
+
+        academicMonths.forEach((mObj, idx) => {
+          // આ ધોરણ અને આ માસમાં વંચાયેલા પુસ્તકોની ચોક્કસ ગણતરી
+          const count = transactions.filter(t => {
+            const tStdNum = cleanStdNumber(t.std);
+            if (tStdNum !== std) return false;
+
+            const c = getDateComponents(t.issue_date);
+            if (!c) return false;
+
+            return c.year === mObj.yr && c.month === mObj.m;
+          }).length;
+
+          rowTotal += count;
+          monthTotals[idx] += count;
+          cellsHtml += `<td class="p-2 border ${count > 0 ? 'font-bold text-indigo-700 bg-indigo-50/50' : 'text-slate-300'}">${count}</td>`;
+        });
+
+        grandTotal += rowTotal;
+        cellsHtml += `<td class="p-2 border font-black bg-indigo-50 text-indigo-900">${rowTotal}</td>`;
+        row.innerHTML = cellsHtml;
+        body.appendChild(row);
+      });
+
+      const foot = document.getElementById('matrixFoot');
+      foot.innerHTML = `
+        <tr>
+          <td class="p-2.5 border text-left font-black">કુલ વાંચન</td>
+          ${monthTotals.map(cnt => `<td class="p-2 border font-bold text-slate-800">${cnt}</td>`).join('')}
+          <td class="p-2 border font-black bg-amber-400 text-indigo-950 text-sm">${grandTotal}</td>
+        </tr>
+      `;
+    }
+
+    // --- SETTINGS ---
+    function loadSettingsToUI() {
+      document.getElementById('settingSchoolName').value = schoolSettings.name;
+      document.getElementById('settingSchoolAddress').value = schoolSettings.address;
+      document.getElementById('settingDiseCode').value = schoolSettings.dise;
+    }
+
+    function handleLogoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        schoolSettings.logo = evt.target.result;
+        localStorage.setItem('lib_school_settings', JSON.stringify(schoolSettings));
+        renderAllHeaders();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveSchoolSettings() {
+      schoolSettings.address = document.getElementById('settingSchoolAddress').value.trim();
+      localStorage.setItem('lib_school_settings', JSON.stringify(schoolSettings));
+      renderAllHeaders();
+      alert('શાળાની વિગતો સાચવી લેવાઈ છે!');
+    }
+
+    // --- EXCEL IMPORT / EXPORT ---
+    function importStudentsExcel() {
+      const fileInput = document.getElementById('studentExcelFile');
+      if (!fileInput.files.length) { alert('Excel ફાઇલ પસંદ કરો.'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+
+        let count = 0;
+        json.forEach(row => {
+          const gr = row['GR_NO'] || row['gr_no'] || row['GR'] || row['જીઆર'];
+          const name = row['STUDENT_NAME'] || row['student_name'] || row['NAME'] || row['નામ'];
+          const std = row['STANDARD'] || row['standard'] || row['STD'] || row['ધોરણ'];
+          const roll = row['ROLL_NO'] || row['roll_no'] || row['રોલ નં'] || '';
+
+          if (gr && name) {
+            const idx = students.findIndex(s => String(s.gr_no) === String(gr));
+            const rec = { gr_no: String(gr), name: String(name), std: String(std || ''), roll_no: String(roll) };
+            if (idx >= 0) students[idx] = rec;
+            else students.push(rec);
+            count++;
+          }
+        });
+
+        localStorage.setItem('lib_students', JSON.stringify(students));
+        updateBadges();
+        populateDataLists();
+        renderRegisterTable();
+        alert(`${count} વિદ્યાર્થીઓ સફળતાપૂર્વક અપલોડ થયા!`);
+        markDataChanged();
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    }
+
+    function importBooksExcel() {
+      const fileInput = document.getElementById('bookExcelFile');
+      if (!fileInput.files.length) { alert('Excel ફાઇલ પસંદ કરો.'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+
+        let count = 0;
+        json.forEach(row => {
+          const id = row['BOOK_ID'] || row['book_id'] || row['ACC_NO'] || row['ક્રમાંક'];
+          const title = row['BOOK_TITLE'] || row['book_title'] || row['TITLE'] || row['પુસ્તક'];
+          const author = row['AUTHOR'] || row['author'] || row['લેખક'] || '';
+          const source = row['SOURCE'] || row['source'] || row['સ્ત્રોત'] || 'ખરીદી';
+
+          if (id && title) {
+            const idx = books.findIndex(b => String(b.book_id).toLowerCase() === String(id).toLowerCase());
+            const rec = {
+              book_id: String(id),
+              title: String(title),
+              author: String(author),
+              source: String(source),
+              receipt_date: new Date().toISOString().split('T')[0],
+              status: 'ACTIVE'
+            };
+            if (idx >= 0) books[idx] = Object.assign(books[idx], rec);
+            else books.push(rec);
+            count++;
+          }
+        });
+
+        localStorage.setItem('lib_books', JSON.stringify(books));
+        updateBadges();
+        populateDataLists();
+        renderDeadstockTable();
+        alert(`${count} પુસ્તકો ડેડસ્ટોકમાં અપલોડ થયા!`);
+        markDataChanged();
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    }
+
+    function downloadStudentTemplate() {
+      const sample = [
+        { GR_NO: '101', STUDENT_NAME: 'પટેલ આયુષ આર.', STANDARD: '6', ROLL_NO: '1' },
+        { GR_NO: '102', STUDENT_NAME: 'શાહ દિયા કે.', STANDARD: '6', ROLL_NO: '2' }
+      ];
+      const ws = XLSX.utils.json_to_sheet(sample);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Students");
+      XLSX.writeFile(wb, "Student_Master_Template.xlsx");
+    }
+
+    function downloadBookTemplate() {
+      const sample = [
+        { BOOK_ID: 'B-101', BOOK_TITLE: 'પંચતંત્રની શ્રેષ્ઠ વાર્તાઓ', AUTHOR: 'વિષ્ણુ શર્મા', SOURCE: 'ખરીદી' },
+        { BOOK_ID: 'B-102', BOOK_TITLE: 'અગનપંખ - અબ્દુલ કલામ', AUTHOR: 'અરુણ તિવારી', SOURCE: 'SSA કચેરી' }
+      ];
+      const ws = XLSX.utils.json_to_sheet(sample);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Deadstock_Books");
+      XLSX.writeFile(wb, "Deadstock_Book_Template.xlsx");
+    }
+
+    function exportAllData() {
+      const wb = XLSX.utils.book_new();
+      if (transactions.length > 0) {
+        const wsTxn = XLSX.utils.json_to_sheet(transactions);
+        XLSX.utils.book_append_sheet(wb, wsTxn, "Issue_Register");
+      }
+      if (books.length > 0) {
+        const wsBk = XLSX.utils.json_to_sheet(books);
+        XLSX.utils.book_append_sheet(wb, wsBk, "Deadstock_Register");
+      }
+      if (students.length > 0) {
+        const wsStd = XLSX.utils.json_to_sheet(students);
+        XLSX.utils.book_append_sheet(wb, wsStd, "Students");
+      }
+      XLSX.writeFile(wb, `Library_Complete_Register_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
+    function loadSampleDemoData() {
+      if (!confirm("સેમ્પલ ડેમો ડેટા લોડ કરવો છે?")) return;
+      students = [
+        { gr_no: '6294', name: 'પટેલ આયુષ આર.', std: '6', roll_no: '1' },
+        { gr_no: '6295', name: 'શાહ દિયા કે.', std: '6', roll_no: '2' },
+        { gr_no: '6296', name: 'વ્યાસ હિતાર્થ જે.', std: '7', roll_no: '1' }
+      ];
+      books = [
+        { book_id: 'B-01', title: 'પંચતંત્રની શ્રેષ્ઠ વાર્તાઓ', author: 'વિષ્ણુ શર્મા', source: 'ખરીદી', price: 120, receipt_date: '2025-06-15', status: 'ACTIVE' },
+        { book_id: 'B-02', title: 'અગનપંખ - અબ્દુલ કલામ', author: 'અરુણ તિવારી', source: 'SSA કચેરી', price: 180, receipt_date: '2025-08-10', status: 'ACTIVE' },
+        { book_id: 'B-03', title: 'સત્યના પ્રયોગો (જીર્ણ/કમી)', author: 'મહાત્મા ગાંધી', source: 'શાળા સમિતિ', price: 150, receipt_date: '2024-01-10', status: 'DISCARDED', write_off_date: '2026-04-10', write_off_reason: 'ફાટી ગયેલ / જીર્ણ થયેલ', write_off_ref: 'ઠરાવ નં. ૪' }
+      ];
+      transactions = [
+        { id: 'T1', gr_no: '6294', student_name: 'પટેલ આયુષ આર.', std: '6', book_id: 'B-01', book_title: 'પંચતંત્રની શ્રેષ્ઠ વાર્તાઓ', book_author: 'વિષ્ણુ શર્મા', issue_date: '2026-06-15', return_date: '2026-06-22', status: 'RETURNED' }
+      ];
+
+      localStorage.setItem('lib_students', JSON.stringify(students));
+      localStorage.setItem('lib_books', JSON.stringify(books));
+      localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+
+      updateBadges();
+      populateDataLists();
+      renderRegisterTable();
+      renderDeadstockTable();
+      renderActiveIssues();
+      generateReports();
+      alert('સેમ્પલ ડેટા લોડ થઈ ગયો!');
+    }
+
+    // સુરક્ષા પાસવર્ડ સાથે માત્ર Issue_Register નો ડેટા રિમૂવ કરો
+    async function clearIssueRegisterWithPassword() {
+      if (!licenseSession) { alert('કૃપા કરીને પહેલા લૉગિન કરો.'); return; }
+      const pass = prompt("Issue_Register ડેટા રિમૂવ કરવા માટે તમારો લૉગિન પાસવર્ડ દાખલ કરો:");
+      if (pass === null) return;
+
+      if (pass.trim() !== licenseSession.pw) {
+        alert("❌ ખોટો પાસવર્ડ! Issue_Register નો ડેટા રિમૂવ કરવાની મંજૂરી નથી.");
+        return;
+      }
+
+      if (!confirm("⚠️ ચેતવણી: શું તમે ખરેખર તમામ પુસ્તક આપ-લે (Issue_Register) નો ડેટા રિમૂવ કરવા માંગો છો?\n\nવિદ્યાર્થીઓ અને ડેડસ્ટોક પુસ્તકો સુરક્ષિત રહેશે.\nઆ પ્રક્રિયા પૂર્વવત્ થઈ શકશે નહીં!")) {
+        return;
+      }
+
+      transactions = [];
+      localStorage.setItem('lib_transactions', JSON.stringify(transactions));
+
+      updateBadges();
+      populateDataLists();
+      renderRegisterTable();
+      renderActiveIssues();
+      generateReports();
+      renderAllHeaders();
+
+      alert("✅ Issue_Register નો તમામ ડેટા સફળતાપૂર્વક રિમૂવ થઈ ગયો છે!");
+      markDataChanged();
+    }
+
+    function clearStudentsMaster() {
+      if (!confirm('વિદ્યાર્થી માસ્ટર ડિલીટ કરવો છે?')) return;
+      students = [];
+      localStorage.setItem('lib_students', JSON.stringify(students));
+      updateBadges();
+      populateDataLists();
+      renderRegisterTable();
+    }
+
+    function clearBooksMaster() {
+      if (!confirm('પુસ્તક ડેડસ્ટોક ડેટા ડિલીટ કરવો છે?')) return;
+      books = [];
+      localStorage.setItem('lib_books', JSON.stringify(books));
+      updateBadges();
+      populateDataLists();
+      renderDeadstockTable();
+    }
+  </script>
+</body>
+</html>
